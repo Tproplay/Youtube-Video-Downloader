@@ -407,6 +407,7 @@
 
   // ── Web Audio Synthesizer (Chime) ────────────────────────────────────────────
   function playCompletionChime() {
+    if (currentSettings && currentSettings.playChime === false) return;
     if (localStorage.getItem("yt_sound") === "false") return;
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -2906,7 +2907,9 @@
     settingCookies.value = currentSettings.browserCookies || "none";
     settingRetries.value = currentSettings.maxRetries || 3;
     settingAutoOpen.checked = Boolean(currentSettings.autoOpenFolder);
-    settingSound.checked = localStorage.getItem("yt_sound") !== "false";
+    settingSound.checked = currentSettings.playChime !== undefined
+      ? Boolean(currentSettings.playChime)
+      : (localStorage.getItem("yt_sound") !== "false");
   }
 
   btnOpenSettings.addEventListener("click", () => {
@@ -2946,7 +2949,8 @@
 
   btnSaveSettings.addEventListener("click", async () => {
     const selectedTheme = document.querySelector('input[name="theme-choice"]:checked')?.value || "system";
-    localStorage.setItem("yt_sound", settingSound.checked ? "true" : "false");
+    const soundEnabled = settingSound.checked;
+    localStorage.setItem("yt_sound", soundEnabled ? "true" : "false");
 
     const patch = {
       downloadDir: settingFolder.value.trim(),
@@ -2956,6 +2960,7 @@
       browserCookies: settingCookies.value,
       maxRetries: parseInt(settingRetries.value, 10),
       autoOpenFolder: settingAutoOpen.checked,
+      playChime: soundEnabled,
       theme: selectedTheme,
     };
 
