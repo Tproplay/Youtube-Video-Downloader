@@ -138,6 +138,14 @@ namespace YouTubeDownloaderInstaller
             btnCancel.Cursor = Cursors.Hand;
             btnCancel.Click += (s, e) => this.Close();
             this.Controls.Add(btnCancel);
+
+            bool isExisting = Directory.Exists(targetDir) && File.Exists(Path.Combine(targetDir, "package.json"));
+            if (isExisting)
+            {
+                lblSubtitle.Text = "Update existing installation to the latest version";
+                btnInstall.Text = "Update";
+                lblStatus.Text = "An existing installation was detected. Click 'Update' to upgrade.";
+            }
         }
 
         private void BtnInstall_Click(object sender, EventArgs e)
@@ -148,8 +156,9 @@ namespace YouTubeDownloaderInstaller
                 return;
             }
 
+            bool isUpdate = btnInstall.Text == "Update";
             btnInstall.Enabled = false;
-            btnInstall.Text = "Installing...";
+            btnInstall.Text = isUpdate ? "Updating..." : "Installing...";
             btnCancel.Enabled = false;
 
             Thread worker = new Thread(DoInstallation);
@@ -170,9 +179,24 @@ namespace YouTubeDownloaderInstaller
 
         private void DoInstallation()
         {
+            bool isUpdate = Directory.Exists(targetDir) && File.Exists(Path.Combine(targetDir, "package.json"));
             try
             {
-                UpdateProgress("Extracting installation payload...", 15);
+                UpdateProgress("Stopping running instance if active...", 10);
+                try
+                {
+                    ProcessStartInfo psiKill = new ProcessStartInfo("taskkill", "/F /IM node.exe")
+                    {
+                        WindowStyle = ProcessWindowStyle.Hidden,
+                        CreateNoWindow = true
+                    };
+                    Process proc = Process.Start(psiKill);
+                    if (proc != null) proc.WaitForExit(3000);
+                    Thread.Sleep(500);
+                }
+                catch { }
+
+                UpdateProgress("Extracting installation payload...", 20);
 
                 string tempZip = Path.Combine(Path.GetTempPath(), "ytdl_setup_" + Guid.NewGuid().ToString("N") + ".zip");
                 Assembly asm = Assembly.GetExecutingAssembly();
@@ -190,30 +214,73 @@ namespace YouTubeDownloaderInstaller
                 }
 
                 UpdateProgress("Preparing destination folder...", 30);
-                if (Directory.Exists(targetDir))
-                {
-                    try
-                    {
-                        // Terminate running server if existing
-                        Process proc = Process.Start(new ProcessStartInfo("taskkill", "/F /IM node.exe") { WindowStyle = ProcessWindowStyle.Hidden });
-                        if (proc != null) proc.WaitForExit(2000);
-                    }
-                    catch { }
-                }
-                else
+                if (!Directory.Exists(targetDir))
                 {
                     Directory.CreateDirectory(targetDir);
                 }
 
-                UpdateProgress("Installing application files & bundled runtimes...", 55);
-                ZipFile.ExtractToDirectory(tempZip, targetDir);
+                UpdateProgress(isUpdate ? "Updating application files & bundled runtimes..." : "Installing application files & bundled runtimes...", 35);
+
+                using (ZipArchive archive = ZipFile.OpenRead(tempZip))
+                {
+                    int total = archive.Entries.Count;
+                    int idx = 0;
+                    foreach (ZipArchiveEntry entry in archive.Entries)
+                    {
+                        idx++;
+                        string relPath = entry.FullName.Replace('/', Path.DirectorySeparatorChar);
+                        string fullPath = Path.Combine(targetDir, relPath);
+
+                        if (string.IsNullOrEmpty(entry.Name) || relPath.EndsWith(Path.DirectorySeparatorChar.ToString()))
+                        {
+                            if (!Directory.Exists(fullPath)) Directory.CreateDirectory(fullPath);
+                            continue;
+                        }
+
+                        string parentDir = Path.GetDirectoryName(fullPath);
+                        if (!string.IsNullOrEmpty(parentDir) && !Directory.Exists(parentDir))
+                        {
+                            Directory.CreateDirectory(parentDir);
+                        }
+
+                        // Preserve existing user data files (history.json, settings.json, queue.json)
+                        bool isUserData = relPath.StartsWith("data" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+                        if (isUserData && File.Exists(fullPath))
+                        {
+                            continue;
+                        }
+
+                        // Overwrite file with retries in case of transient file locks
+                        int attempts = 0;
+                        while (true)
+                        {
+                            try
+                            {
+                                entry.ExtractToFile(fullPath, true);
+                                break;
+                            }
+                            catch (IOException)
+                            {
+                                attempts++;
+                                if (attempts >= 5) throw;
+                                Thread.Sleep(300);
+                            }
+                        }
+
+                        if (idx % 10 == 0 || idx == total)
+                        {
+                            int pct = 35 + (int)((idx / (double)total) * 40);
+                            UpdateProgress((isUpdate ? "Updating: " : "Extracting: ") + entry.Name, pct);
+                        }
+                    }
+                }
 
                 try { File.Delete(tempZip); } catch { }
 
-                UpdateProgress("Creating Windows Search & Start Menu shortcuts...", 75);
+                UpdateProgress("Updating Windows Search & Start Menu shortcuts...", 80);
                 CreateShortcuts(targetDir);
 
-                UpdateProgress("Registering uninstaller in Windows...", 88);
+                UpdateProgress("Registering uninstaller in Windows...", 90);
                 RegisterUninstaller(targetDir);
 
                 UpdateProgress("Launching YouTube Video Downloader...", 95);
@@ -226,12 +293,12 @@ namespace YouTubeDownloaderInstaller
                     Process.Start(psi);
                 }
 
-                UpdateProgress("Installation Complete!", 100);
+                UpdateProgress(isUpdate ? "Update Complete!" : "Installation Complete!", 100);
 
                 this.BeginInvoke(new Action(() =>
                 {
                     lblStatus.ForeColor = Color.FromArgb(60, 220, 100);
-                    lblStatus.Text = "âœ” Installation Complete! The app has launched.";
+                    lblStatus.Text = isUpdate ? "Update Complete! The app has launched." : "Installation Complete! The app has launched.";
                     btnInstall.Text = "Finish";
                     btnInstall.Enabled = true;
                     btnInstall.BackColor = Color.FromArgb(40, 160, 70);
