@@ -51,6 +51,13 @@
   const chkPlaylistNumbering = document.getElementById("chk-playlist-numbering");
   const chkPlaylistSubfolder = document.getElementById("chk-playlist-subfolder");
 
+  const batchPreview = document.getElementById("batch-preview");
+  const batchPreviewTitle = document.getElementById("batch-preview-title");
+  const batchPreviewCount = document.getElementById("batch-preview-count");
+  const batchPreviewList = document.getElementById("batch-preview-list");
+  const batchVideoMap = new Map();
+  let currentBatchFetchController = null;
+
   // Dropdowns
   const selectType = document.getElementById("select-type");
   const selectQuality = document.getElementById("select-quality");
@@ -747,7 +754,7 @@
     const uniqueValid = Array.from(new Set(validLines));
 
     if (uniqueValid.length > 1) {
-      btnAddText.textContent = `Add ${uniqueValid.length} Items to Queue`;
+      btnAddText.textContent = `Add ${uniqueValid.length} Videos to Queue`;
       return;
     }
 
@@ -781,10 +788,15 @@
       if (previewPlaceholder) previewPlaceholder.hidden = false;
       videoPreview.hidden = true;
       playlistPreview.hidden = true;
+      if (batchPreview) batchPreview.hidden = true;
       previewSkeleton.hidden = true;
       previewError.hidden = true;
       activeVideoInfo = null;
       activePlaylistInfo = null;
+      batchVideoMap.clear();
+      if (currentBatchFetchController) {
+        currentBatchFetchController.abort();
+      }
       updateAddButtonLabel();
       return;
     }
@@ -859,19 +871,153 @@
 
   async function handleUrlInput() {
     const raw = urlInput.value.trim();
-    const firstLine = raw.split("\n")[0].trim();
-
-    if (!isYouTubeUrl(firstLine)) {
-      videoPreview.hidden = true;
-      playlistPreview.hidden = true;
-      previewError.hidden = true;
+    if (!raw) {
+      if (videoPreview) videoPreview.hidden = true;
+      if (playlistPreview) playlistPreview.hidden = true;
+      if (batchPreview) batchPreview.hidden = true;
+      if (previewError) previewError.hidden = true;
+      if (previewPlaceholder) previewPlaceholder.hidden = false;
       return;
     }
 
-    if (isPlaylistUrl(firstLine)) {
-      fetchPlaylist(firstLine);
-    } else {
-      fetchVideo(firstLine);
+    const lines = raw.split("\n").map((l) => l.trim()).filter((l) => Boolean(l) && isYouTubeUrl(l));
+
+    if (lines.length === 0) {
+      if (videoPreview) videoPreview.hidden = true;
+      if (playlistPreview) playlistPreview.hidden = true;
+      if (batchPreview) batchPreview.hidden = true;
+      if (previewError) previewError.hidden = true;
+      if (previewPlaceholder) previewPlaceholder.hidden = false;
+      return;
+    }
+
+    if (lines.length === 1) {
+      const url = lines[0];
+      if (batchPreview) batchPreview.hidden = true;
+      if (isPlaylistUrl(url)) {
+        fetchPlaylist(url);
+      } else {
+        fetchVideo(url);
+      }
+      return;
+    }
+
+    // Multiple valid YouTube URLs: Render Batch Preview Card
+    if (previewPlaceholder) previewPlaceholder.hidden = true;
+    if (previewSkeleton) previewSkeleton.hidden = true;
+    if (videoPreview) videoPreview.hidden = true;
+    if (playlistPreview) playlistPreview.hidden = true;
+    if (previewError) previewError.hidden = true;
+    if (batchPreview) batchPreview.hidden = false;
+
+    renderBatchPreview(lines);
+  }
+
+  function renderBatchPreview(urls) {
+    if (!batchPreviewList) return;
+    if (batchPreviewTitle) batchPreviewTitle.textContent = "Batch Download";
+    if (batchPreviewCount) batchPreviewCount.textContent = `${urls.length} videos queued`;
+
+    batchPreviewList.innerHTML = "";
+
+    urls.forEach((url, idx) => {
+      const cached = batchVideoMap.get(url);
+      const li = document.createElement("li");
+      li.className = "batch-preview-item";
+      li.dataset.url = url;
+
+      let thumbHtml = "";
+      if (cached && cached.thumbnail) {
+        thumbHtml = `<img class="batch-item-thumb" src="${escapeHtml(cached.thumbnail)}" alt="Thumb" />`;
+      } else {
+        thumbHtml = `<div class="batch-item-thumb-placeholder">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+        </div>`;
+      }
+
+      const titleText = cached && cached.title ? cached.title : "Fetching video details…";
+      const metaText = cached
+        ? `${cached.uploader ? escapeHtml(cached.uploader) + " • " : ""}${formatDuration(cached.duration)}`
+        : escapeHtml(url.length > 50 ? url.substring(0, 48) + "…" : url);
+
+      li.innerHTML = `
+        <span class="batch-item-index">${idx + 1}</span>
+        ${thumbHtml}
+        <div class="batch-item-info">
+          <span class="batch-item-title">${escapeHtml(titleText)}</span>
+          <span class="batch-item-meta">${metaText}</span>
+        </div>
+      `;
+      batchPreviewList.appendChild(li);
+    });
+
+    fetchBatchVideoInfo(urls);
+  }
+
+  function updateBatchItemUI(url, data) {
+    if (!batchPreviewList) return;
+    const items = batchPreviewList.querySelectorAll(".batch-preview-item");
+    for (const item of items) {
+      if (item.dataset.url === url) {
+        if (data && data.title) {
+          const titleEl = item.querySelector(".batch-item-title");
+          const metaEl = item.querySelector(".batch-item-meta");
+          if (titleEl) titleEl.textContent = data.title;
+          if (metaEl) {
+            metaEl.textContent = `${data.uploader ? data.uploader + " • " : ""}${formatDuration(data.duration)}`;
+          }
+
+          if (data.thumbnail) {
+            const placeholder = item.querySelector(".batch-item-thumb-placeholder");
+            if (placeholder) {
+              const img = document.createElement("img");
+              img.className = "batch-item-thumb";
+              img.src = data.thumbnail;
+              img.alt = "Thumb";
+              placeholder.replaceWith(img);
+            }
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  async function fetchBatchVideoInfo(urls) {
+    if (currentBatchFetchController) {
+      currentBatchFetchController.abort();
+    }
+    currentBatchFetchController = new AbortController();
+    const signal = currentBatchFetchController.signal;
+
+    const toFetch = urls.filter((u) => !batchVideoMap.has(u));
+    if (toFetch.length === 0) return;
+
+    const chunkSize = 2;
+    for (let i = 0; i < toFetch.length; i += chunkSize) {
+      if (signal.aborted) break;
+      const chunk = toFetch.slice(i, i + chunkSize);
+      await Promise.allSettled(
+        chunk.map(async (u) => {
+          if (signal.aborted) return;
+          try {
+            const res = await apiFetch(`/api/info?url=${encodeURIComponent(u)}`, { signal });
+            if (res.ok) {
+              const data = await res.json();
+              batchVideoMap.set(u, data);
+              updateBatchItemUI(u, data);
+            } else {
+              batchVideoMap.set(u, { title: "YouTube Video", thumbnail: "", uploader: "", duration: 0 });
+            }
+          } catch {
+            if (!signal.aborted) {
+              batchVideoMap.set(u, { title: "YouTube Video", thumbnail: "", uploader: "", duration: 0 });
+            }
+          }
+        })
+      );
     }
   }
 
@@ -905,6 +1051,7 @@
     previewSkeleton.hidden = false;
     videoPreview.hidden = true;
     playlistPreview.hidden = true;
+    if (batchPreview) batchPreview.hidden = true;
     previewError.hidden = true;
 
     const controller = new AbortController();
@@ -1012,6 +1159,7 @@
     previewSkeleton.hidden = false;
     videoPreview.hidden = true;
     playlistPreview.hidden = true;
+    if (batchPreview) batchPreview.hidden = true;
     previewError.hidden = true;
 
     const controller = new AbortController();
@@ -1488,15 +1636,34 @@
 
     const executeAdd = async () => {
       try {
-        const res = await apiFetch("/api/queue/add", {
-          method: "POST",
-          body: {
-            urls: lines,
-            title: activeVideoInfo ? activeVideoInfo.title : "",
-            thumbnail: activeVideoInfo ? activeVideoInfo.thumbnail : "",
-            options: opts,
-          },
-        });
+        let res;
+        if (lines.length === 1) {
+          res = await apiFetch("/api/queue/add", {
+            method: "POST",
+            body: {
+              url: lines[0],
+              title: activeVideoInfo ? activeVideoInfo.title : "",
+              thumbnail: activeVideoInfo ? activeVideoInfo.thumbnail : "",
+              options: opts,
+            },
+          });
+        } else {
+          const itemsPayload = lines.map((url) => {
+            const meta = batchVideoMap.get(url);
+            return {
+              url,
+              title: meta && meta.title ? meta.title : "",
+              thumbnail: meta && meta.thumbnail ? meta.thumbnail : "",
+              options: opts,
+            };
+          });
+          res = await apiFetch("/api/queue/add", {
+            method: "POST",
+            body: {
+              items: itemsPayload,
+            },
+          });
+        }
         const data = await res.json();
 
         if (res.ok) {
@@ -1505,8 +1672,13 @@
           validateUrlLines();
           videoPreview.hidden = true;
           playlistPreview.hidden = true;
+          if (batchPreview) batchPreview.hidden = true;
           activeVideoInfo = null;
           activePlaylistInfo = null;
+          batchVideoMap.clear();
+          if (currentBatchFetchController) {
+            currentBatchFetchController.abort();
+          }
           if (previewPlaceholder) previewPlaceholder.hidden = false;
           switchToQueueTab();
         } else {
