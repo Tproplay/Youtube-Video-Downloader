@@ -1712,7 +1712,44 @@
     const executeAdd = async () => {
       try {
         let res;
-        if (lines.length === 1) {
+        if (lines.length === 1 && isPlaylistUrl(lines[0])) {
+          if (!activePlaylistInfo || !activePlaylistInfo.items) {
+            btnAddText.textContent = "Fetching playlist videos…";
+            btnAddQueue.disabled = true;
+            try {
+              const plRes = await apiFetch(`/api/playlist?url=${encodeURIComponent(lines[0])}`);
+              if (plRes.ok) {
+                activePlaylistInfo = await plRes.json();
+              }
+            } catch { }
+            btnAddQueue.disabled = false;
+            updateAddButtonLabel();
+          }
+
+          if (activePlaylistInfo && Array.isArray(activePlaylistInfo.items) && activePlaylistInfo.items.length > 0) {
+            const playlistItemsPayload = activePlaylistInfo.items.map((it) => ({
+              url: it.url,
+              title: it.title,
+              thumbnail: it.thumbnail,
+              options: { ...opts, isPlaylist: false },
+            }));
+
+            res = await apiFetch("/api/queue/add", {
+              method: "POST",
+              body: { items: playlistItemsPayload },
+            });
+          } else {
+            res = await apiFetch("/api/queue/add", {
+              method: "POST",
+              body: {
+                url: lines[0],
+                title: activeVideoInfo ? activeVideoInfo.title : "",
+                thumbnail: activeVideoInfo ? activeVideoInfo.thumbnail : "",
+                options: opts,
+              },
+            });
+          }
+        } else if (lines.length === 1) {
           if (!activeVideoInfo || !activeVideoInfo.title) {
             btnAddText.textContent = "Fetching video details…";
             btnAddQueue.disabled = true;
@@ -1775,7 +1812,8 @@
         const data = await res.json();
 
         if (res.ok) {
-          showToast(lines.length === 1 ? "Added video to queue!" : `Added ${lines.length} videos to queue!`, "success");
+          const addedCount = data && typeof data.count === "number" ? data.count : lines.length;
+          showToast(addedCount === 1 ? "Added video to queue!" : `Added ${addedCount} videos to queue!`, "success");
           urlInput.value = "";
           validateUrlLines();
           videoPreview.hidden = true;
@@ -2164,6 +2202,17 @@
     if (tag) {
       tag.className = `status-tag ${item.status}`;
       tag.textContent = item.status.toUpperCase();
+    }
+
+    const titleEl = existing.querySelector(".queue-title");
+    if (titleEl && item.title && item.title !== "YouTube Video" && titleEl.textContent !== item.title) {
+      titleEl.textContent = item.title;
+      titleEl.title = item.title;
+    }
+
+    const currentThumbWrap = existing.querySelector(".queue-thumb-wrap");
+    if (currentThumbWrap && item.thumbnail && !currentThumbWrap.querySelector("img")) {
+      currentThumbWrap.outerHTML = renderThumbHtml(item.thumbnail);
     }
 
     const statusTextEl = existing.querySelector(".queue-status-text");
