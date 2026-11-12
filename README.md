@@ -169,8 +169,9 @@ Settings can be accessed by clicking the gear icon in the top right or pressing 
 ```text
 Youtube Video Downloader/
 ├── assets/
-│   ├── app.ico                    # Multi-resolution Windows application icon
-│   └── app.png                    # High-resolution raster icon asset
+│   ├── app.ico                    # Multi-resolution Windows application icon (16x16 to 256x256)
+│   ├── app.png                    # High-resolution raster icon asset (256x256)
+│   └── icon-source.png            # Master brand icon source
 ├── data/                          # Runtime user data (created automatically, ignored by Git)
 │   ├── app.log                    # Local diagnostic application log (with 3 MB rollover)
 │   ├── history.json               # Downloaded media history registry
@@ -193,12 +194,13 @@ Youtube Video Downloader/
 │   └── ytdlp.js                   # Process execution wrapper for yt-dlp and ffmpeg
 ├── public/
 │   ├── app.js                     # Frontend vanilla JavaScript client and UI controller
-│   ├── favicon.ico                # Web icon
+│   ├── favicon.ico                # Multi-resolution browser icon
+│   ├── icon.png                   # High-resolution web brand icon
 │   ├── index.html                 # Semantic HTML5 single-page application structure
 │   └── style.css                  # Responsive dark/light theme CSS design
 ├── scripts/
 │   ├── build-installer.ps1        # Packaging script that creates the standalone setup executable
-│   ├── create-app-icon.ps1        # Generates clean .ico from SVG vector shapes
+│   ├── create-app-icon.ps1        # Generates multi-resolution .ico and web assets from master icon
 │   ├── install-shortcut.ps1       # Creates Start Menu and Desktop shortcuts for development installs
 │   └── uninstall-shortcut.ps1     # Removes shortcuts and unregisters development installs
 ├── src-installer/
