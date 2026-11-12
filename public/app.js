@@ -1507,6 +1507,107 @@
   }
 
   let activePreviewMode = "thumb";
+  let playerPollInterval = null;
+  let isResettingToStart = false;
+  let resetCooldownTimer = null;
+
+  function postYouTubeCommand(func, args = []) {
+    if (!previewIframe || !previewIframe.contentWindow) return;
+    try {
+      previewIframe.contentWindow.postMessage(
+        JSON.stringify({
+          event: "command",
+          func: func,
+          args: args
+        }),
+        "*"
+      );
+    } catch {}
+  }
+
+  function sendYouTubeListening() {
+    if (!previewIframe || !previewIframe.contentWindow) return;
+    try {
+      previewIframe.contentWindow.postMessage(JSON.stringify({ event: "listening" }), "*");
+      previewIframe.contentWindow.postMessage(
+        JSON.stringify({ event: "command", func: "addEventListener", args: ["onStateChange"] }),
+        "*"
+      );
+    } catch {}
+  }
+
+  function startPlayerPolling() {
+    stopPlayerPolling();
+    sendYouTubeListening();
+    playerPollInterval = setInterval(() => {
+      if (activePreviewMode === "player") {
+        sendYouTubeListening();
+      } else {
+        stopPlayerPolling();
+      }
+    }, 400);
+  }
+
+  function stopPlayerPolling() {
+    if (playerPollInterval) {
+      clearInterval(playerPollInterval);
+      playerPollInterval = null;
+    }
+  }
+
+  function handleYouTubeWindowMessage(event) {
+    if (!previewIframe || activePreviewMode !== "player") return;
+    let data = event.data;
+    if (typeof data === "string") {
+      try {
+        data = JSON.parse(data);
+      } catch {
+        return;
+      }
+    }
+    if (!data || typeof data !== "object") return;
+
+    const startSec = parseDurationToSeconds(clipStart ? clipStart.value : "0") || 0;
+    const endSec = parseDurationToSeconds(clipEnd ? clipEnd.value : "");
+    const duration = activeVideoInfo ? activeVideoInfo.duration : 0;
+    const hasCustomEnd = endSec > 0 && (!duration || endSec < duration);
+    const targetEnd = hasCustomEnd ? endSec : (duration > 0 ? duration : 0);
+
+    // 1. YouTube Player State Change: 0 = ENDED
+    if (data.event === "onStateChange" && data.info === 0) {
+      if (!isResettingToStart) {
+        isResettingToStart = true;
+        postYouTubeCommand("pauseVideo");
+        postYouTubeCommand("seekTo", [startSec, true]);
+        clearTimeout(resetCooldownTimer);
+        resetCooldownTimer = setTimeout(() => {
+          isResettingToStart = false;
+        }, 800);
+      }
+      return;
+    }
+
+    // 2. Playback progress via infoDelivery
+    if (data.info && typeof data.info.currentTime === "number") {
+      const curTime = data.info.currentTime;
+      if (isResettingToStart) {
+        if (Math.abs(curTime - startSec) < 1.0) {
+          isResettingToStart = false;
+        }
+        return;
+      }
+
+      if (targetEnd > 0 && targetEnd > startSec && curTime >= targetEnd) {
+        isResettingToStart = true;
+        postYouTubeCommand("pauseVideo");
+        postYouTubeCommand("seekTo", [startSec, true]);
+        clearTimeout(resetCooldownTimer);
+        resetCooldownTimer = setTimeout(() => {
+          isResettingToStart = false;
+        }, 800);
+      }
+    }
+  }
 
   function setPreviewMode(mode, autoplay = false) {
     activePreviewMode = mode;
@@ -1526,7 +1627,9 @@
 
     if (isPlayer) {
       loadPreviewPlayerIframe(autoplay);
+      startPlayerPolling();
     } else {
+      stopPlayerPolling();
       if (previewIframe) previewIframe.src = "";
     }
   }
@@ -1539,7 +1642,7 @@
     const duration = activeVideoInfo ? activeVideoInfo.duration : 0;
     const endSec = parseDurationToSeconds(clipEnd ? clipEnd.value : "");
 
-    let embedUrl = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?enablejsapi=1&rel=0&playsinline=1`;
+    let embedUrl = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?enablejsapi=1&rel=0&playsinline=1&origin=${encodeURIComponent(window.location.origin)}`;
     if (startSec > 0) {
       embedUrl += `&start=${Math.floor(startSec)}`;
     }
@@ -1657,6 +1760,13 @@
     if (btnSyncPlayerCut) {
       btnSyncPlayerCut.addEventListener("click", () => loadPreviewPlayerIframe(true));
     }
+
+    if (previewIframe) {
+      previewIframe.addEventListener("load", () => {
+        sendYouTubeListening();
+      });
+    }
+    window.addEventListener("message", handleYouTubeWindowMessage);
 
     updateDualSliderUI();
   }
