@@ -694,7 +694,64 @@
   }
 
   // ── Estimated File Size Live Calculation ─────────────────────────────────────
+  function computeEstimatedBytes(durationSec, type, quality, audioQuality) {
+    if (!durationSec || durationSec <= 0) return 0;
+    if (type === "audio_only") {
+      let kbps = 192;
+      if (audioQuality === "320") kbps = 320;
+      else if (audioQuality === "128") kbps = 128;
+      else if (audioQuality === "best") kbps = 256;
+      return (kbps * 1000 / 8) * durationSec;
+    }
+
+    let kbps = 3800; // 1080p
+    if (quality === "2160" || quality === "4k") kbps = 14000;
+    else if (quality === "1440" || quality === "2k") kbps = 7500;
+    else if (quality === "1080") kbps = 3800;
+    else if (quality === "720") kbps = 2000;
+    else if (quality === "480") kbps = 1000;
+    else if (quality === "360") kbps = 600;
+    else if (quality === "best") kbps = 4500;
+    return (kbps * 1000 / 8) * durationSec;
+  }
+
+  function updatePlaylistEstimates() {
+    if (!activePlaylistInfo || !playlistPreview || playlistPreview.hidden) return;
+    const type = getSelectValue(selectType);
+    const quality = getSelectValue(selectQuality);
+    const audioQ = getSelectValue(selectAudioQuality);
+
+    let totalSelectedBytes = 0;
+    let selectedCount = 0;
+
+    const items = playlistItemsList.querySelectorAll(".playlist-item");
+    items.forEach((itemEl) => {
+      const chk = itemEl.querySelector(".playlist-chk");
+      const duration = parseInt(itemEl.dataset.duration || "0", 10);
+      const estBytes = computeEstimatedBytes(duration, type, quality, audioQ);
+      const sizeEl = itemEl.querySelector(".playlist-item-size");
+      if (sizeEl) {
+        sizeEl.textContent = estBytes > 0 ? `~${formatBytes(estBytes)}` : "--";
+      }
+
+      if (chk && chk.checked) {
+        selectedCount++;
+        totalSelectedBytes += estBytes;
+      }
+    });
+
+    if (playlistCount) {
+      if (selectedCount === 0) {
+        playlistCount.textContent = "0 videos selected";
+      } else {
+        const totalStr = totalSelectedBytes > 0 ? ` • Est. Total: ~${formatBytes(totalSelectedBytes)}` : "";
+        playlistCount.textContent = `${selectedCount} of ${activePlaylistInfo.itemCount} selected${totalStr}`;
+      }
+    }
+  }
+
   function updateEstimatedFileSize() {
+    updatePlaylistEstimates();
     if (!activeVideoInfo || !previewEstSize) return;
 
     const type = getSelectValue(selectType);
@@ -1192,12 +1249,23 @@
       playlistCount.textContent = `${data.itemCount} videos`;
       playlistItemsList.innerHTML = "";
 
+      const type = getSelectValue(selectType);
+      const quality = getSelectValue(selectQuality);
+      const audioQ = getSelectValue(selectAudioQuality);
+
       data.items.forEach((item) => {
         const li = document.createElement("li");
         li.className = "playlist-item";
+        li.dataset.duration = (item.duration || 0).toString();
+
+        const estBytes = computeEstimatedBytes(item.duration, type, quality, audioQ);
+        const estStr = estBytes > 0 ? `~${formatBytes(estBytes)}` : "--";
+
         li.innerHTML = `
-          <input type="checkbox" class="playlist-chk" data-url="${escapeHtml(item.url)}" data-title="${escapeHtml(item.title)}" data-thumb="${escapeHtml(item.thumbnail)}" checked />
-          <span class="playlist-item-title">${escapeHtml(item.title)}</span>
+          <input type="checkbox" class="playlist-chk" data-url="${escapeHtml(item.url)}" data-title="${escapeHtml(item.title)}" data-thumb="${escapeHtml(item.thumbnail)}" data-duration="${item.duration || 0}" checked />
+          ${item.thumbnail ? `<img class="playlist-item-thumb" src="${escapeHtml(item.thumbnail)}" alt="" onerror="this.style.display='none'" />` : `<div class="playlist-item-thumb-placeholder"></div>`}
+          <span class="playlist-item-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</span>
+          <span class="playlist-item-size" title="Estimated download size">${estStr}</span>
           <span class="playlist-item-duration">${formatDuration(item.duration)}</span>
         `;
         playlistItemsList.appendChild(li);
@@ -1206,6 +1274,7 @@
       playlistRangeEnd.placeholder = data.itemCount.toString();
       if (previewPlaceholder) previewPlaceholder.hidden = true;
       playlistPreview.hidden = false;
+      updatePlaylistEstimates();
       updateAddButtonLabel();
       triggerCommandPreviewUpdate();
     } catch (err) {
@@ -1229,15 +1298,20 @@
   }
 
   // Playlist Controls
-  playlistItemsList.addEventListener("change", () => updateAddButtonLabel());
+  playlistItemsList.addEventListener("change", () => {
+    updatePlaylistEstimates();
+    updateAddButtonLabel();
+  });
 
   btnPlaylistSelectAll.addEventListener("click", () => {
     playlistItemsList.querySelectorAll(".playlist-chk").forEach((c) => (c.checked = true));
+    updatePlaylistEstimates();
     updateAddButtonLabel();
   });
 
   btnPlaylistSelectNone.addEventListener("click", () => {
     playlistItemsList.querySelectorAll(".playlist-chk").forEach((c) => (c.checked = false));
+    updatePlaylistEstimates();
     updateAddButtonLabel();
   });
 
@@ -1249,6 +1323,7 @@
       const num = idx + 1;
       c.checked = num >= start && num <= end;
     });
+    updatePlaylistEstimates();
     updateAddButtonLabel();
     showToast(`Selected items ${start} to ${end}`, "info");
   });
@@ -1609,7 +1684,7 @@
       try {
         const res = await apiFetch("/api/queue/add", {
           method: "POST",
-          body: { urls: playlistItemsPayload.map((p) => p.url), options: opts },
+          body: { items: playlistItemsPayload },
         });
         if (res.ok) {
           showToast(`Added ${checkedBoxes.length} playlist videos to the queue!`, "success");
@@ -1638,6 +1713,19 @@
       try {
         let res;
         if (lines.length === 1) {
+          if (!activeVideoInfo || !activeVideoInfo.title) {
+            btnAddText.textContent = "Fetching video details…";
+            btnAddQueue.disabled = true;
+            try {
+              const infoRes = await apiFetch(`/api/info?url=${encodeURIComponent(lines[0])}`);
+              if (infoRes.ok) {
+                activeVideoInfo = await infoRes.json();
+              }
+            } catch { }
+            btnAddQueue.disabled = false;
+            updateAddButtonLabel();
+          }
+
           res = await apiFetch("/api/queue/add", {
             method: "POST",
             body: {
@@ -1648,6 +1736,26 @@
             },
           });
         } else {
+          // Pre-fetch any missing video metadata so all cards have titles and thumbnails
+          const missingUrls = lines.filter((u) => !batchVideoMap.has(u) || !batchVideoMap.get(u).title);
+          if (missingUrls.length > 0) {
+            btnAddText.textContent = `Fetching details (${lines.length - missingUrls.length}/${lines.length})…`;
+            btnAddQueue.disabled = true;
+            await Promise.allSettled(
+              missingUrls.map(async (u) => {
+                try {
+                  const r = await apiFetch(`/api/info?url=${encodeURIComponent(u)}`);
+                  if (r.ok) {
+                    const d = await r.json();
+                    batchVideoMap.set(u, d);
+                  }
+                } catch { }
+              })
+            );
+            btnAddQueue.disabled = false;
+            updateAddButtonLabel();
+          }
+
           const itemsPayload = lines.map((url) => {
             const meta = batchVideoMap.get(url);
             return {
@@ -1912,6 +2020,20 @@
     });
   }
 
+  function createThumbPlaceholder() {
+    const div = document.createElement("div");
+    div.className = "queue-thumb queue-thumb-placeholder";
+    div.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="6 4 18 12 6 20 6 4" fill="currentColor"></polygon></svg>`;
+    return div;
+  }
+
+  function renderThumbHtml(thumbUrl) {
+    if (thumbUrl && typeof thumbUrl === "string" && thumbUrl.trim() && !thumbUrl.includes("icon48.png")) {
+      return `<img class="queue-thumb" src="${escapeHtml(thumbUrl)}" alt="" onerror="this.onerror=null;this.replaceWith(createThumbPlaceholder())" />`;
+    }
+    return `<div class="queue-thumb queue-thumb-placeholder"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="6 4 18 12 6 20 6 4" fill="currentColor"></polygon></svg></div>`;
+  }
+
   function createQueueCardElement(item) {
     const li = document.createElement("li");
     li.className = "queue-card";
@@ -1932,7 +2054,7 @@
     li.innerHTML = `
       <div class="queue-card-top">
         ${(isQueued || isPaused) ? `<span class="drag-handle" title="Drag to reorder">⋮⋮</span>` : ""}
-        <img class="queue-thumb" src="${item.thumbnail || 'icons/icon48.png'}" alt="" />
+        ${renderThumbHtml(item.thumbnail)}
         <div class="queue-info">
           <p class="queue-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</p>
           <div class="queue-sub">
@@ -2177,7 +2299,7 @@
           <label class="history-chk-wrap" title="Select item">
             <input type="checkbox" class="history-select-chk" data-id="${item.id}" ${selectedHistoryIds.has(item.id) ? "checked" : ""} />
           </label>
-          <img class="queue-thumb" src="${item.thumbnail || 'icons/icon48.png'}" alt="" loading="lazy" />
+          ${renderThumbHtml(item.thumbnail)}
           <div class="history-card-info">
             <p class="history-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</p>
             <p class="history-meta-sub">${escapeHtml(item.format)} • ${item.size} • ${new Date(item.timestamp).toLocaleDateString()}</p>
