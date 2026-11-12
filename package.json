@@ -1,0 +1,22 @@
+{
+  "name": "youtube-video-downloader",
+  "version": "1.0.0",
+  "description": "Local web application for downloading YouTube videos and audio via yt-dlp",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "powershell -ExecutionPolicy Bypass -File scripts/build-installer.ps1",
+    "build-exe": "powershell -ExecutionPolicy Bypass -File scripts/build-installer.ps1",
+    "install-app": "powershell -ExecutionPolicy Bypass -File scripts/install-shortcut.ps1",
+    "uninstall-app": "powershell -ExecutionPolicy Bypass -File scripts/uninstall-shortcut.ps1",
+    "generate-icon": "powershell -ExecutionPolicy Bypass -File scripts/create-app-icon.ps1"
+  },
+  "keywords": [
+    "youtube",
+    "downloader",
+    "yt-dlp",
+    "nodejs"
+  ],
+  "author": "",
+  "license": "MIT"
+}

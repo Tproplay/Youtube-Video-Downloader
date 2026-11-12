@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube Video Downloader</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+</head>
+<body>
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <div class="app-layout">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
+            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+          </svg>
+        </div>
+        <div class="brand-info">
+          <h1>YouTube Downloader</h1>
+          <p class="brand-subtitle">Fast, local, high-fidelity media downloader</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Server Connection Heartbeat indicator -->
+        <div id="conn-pill" class="status-badge conn-connected" title="Server connection status">
+          <span class="status-dot"></span>
+          <span id="conn-text">Connected</span>
+          <button id="btn-conn-retry" class="btn-conn-retry" hidden>Retry now</button>
+        </div>
+
+        <!-- Health status badge -->
+        <div id="health-pill" class="status-badge checking" title="Checking tool dependencies">
+          <span class="status-dot"></span>
+          <span id="health-text">Checking…</span>
+        </div>
+
+        <!-- Update yt-dlp button -->
+        <button id="btn-update-ytdlp" class="btn-ghost-sm" title="Check for and install yt-dlp updates">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          <span>Update yt-dlp</span>
+        </button>
+
+        <!-- Settings button -->
+        <button id="btn-open-settings" class="icon-btn" title="Open Settings" aria-label="Settings">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Health Warning Banner (shown if ffmpeg or yt-dlp is missing) -->
+    <div id="health-banner" class="alert-banner warning" hidden>
+      <div class="alert-icon">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+          <line x1="12" y1="9" x2="12" y2="13"></line>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+      </div>
+      <div class="alert-content">
+        <p id="health-banner-text" class="alert-text"></p>
+        <div id="health-banner-actions" class="alert-actions"></div>
+      </div>
+    </div>
+
+    <!-- Server Port Mismatch / Connection Banner -->
+    <div id="server-status-banner" class="alert-banner warning" hidden>
+      <div class="alert-icon">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+      </div>
+      <div class="alert-content">
+        <p id="server-status-banner-text" class="alert-text"></p>
+        <div id="server-status-banner-actions" class="alert-actions"></div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs" role="tablist">
+      <button class="nav-tab active" data-tab="tab-download" role="tab" aria-selected="true">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        <span>New Download</span>
+      </button>
+      <button class="nav-tab" data-tab="tab-queue" role="tab" aria-selected="false">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="8" y1="6" x2="21" y2="6"></line>
+          <line x1="8" y1="12" x2="21" y2="12"></line>
+          <line x1="8" y1="18" x2="21" y2="18"></line>
+          <line x1="3" y1="6" x2="3.01" y2="6"></line>
+          <line x1="3" y1="12" x2="3.01" y2="12"></line>
+          <line x1="3" y1="18" x2="3.01" y2="18"></line>
+        </svg>
+        <span>Queue</span>
+        <span id="tab-queue-count" class="tab-badge" hidden>0</span>
+      </button>
+      <button class="nav-tab" data-tab="tab-history" role="tab" aria-selected="false">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        <span>History</span>
+        <span id="tab-history-count" class="tab-badge" hidden>0</span>
+      </button>
+    </nav>
+
+    <!-- ═════════════════════════════════════════════════════════════════════════
+         TAB 1: NEW DOWNLOAD
+    ═════════════════════════════════════════════════════════════════════════ -->
+    <div id="tab-download" class="tab-pane active" role="tabpanel">
+      <div class="download-layout-grid">
+        <!-- Left Column: Form & Controls -->
+        <div class="download-form-col">
+          <section class="card">
+            <div class="input-header">
+              <label for="url-input" class="field-label">YouTube URL or Playlist (Multiple URLs supported)</label>
+              <span class="shortcut-tip">Tip: Press <kbd>Ctrl+V</kbd> to paste, <kbd>Enter</kbd> to add</span>
+            </div>
+
+            <div class="url-input-container">
+              <textarea
+                id="url-input"
+                class="url-textarea"
+                rows="1"
+                placeholder="Paste YouTube link here (or multiple links, one per line)…"
+                spellcheck="false"
+              ></textarea>
+              <div class="input-actions">
+                <button id="btn-paste" class="btn-tool" title="Paste from clipboard">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                  <span>Paste</span>
+                </button>
+                <button id="btn-fetch" class="btn-outlined-sm" title="Fetch video metadata and available qualities">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  <span>Fetch Info</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Inline validation list per line & duplicate detection -->
+            <div id="url-validation-list" class="url-validation-list" hidden></div>
+
+            <!-- Quick Presets Row -->
+            <div class="section-divider">
+              <span class="divider-text">Quick Presets</span>
+            </div>
+
+            <div class="presets-row">
+              <button type="button" class="btn-preset active" data-preset="best">
+                <span class="preset-name">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>
+                  <span>Best Quality</span>
+                </span>
+                <span class="preset-sub">Highest Video + Audio (MP4)</span>
+              </button>
+              <button type="button" class="btn-preset" data-preset="1080">
+                <span class="preset-name">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                  <span>1080p Full HD</span>
+                </span>
+                <span class="preset-sub">Standard HD (MP4)</span>
+              </button>
+              <button type="button" class="btn-preset" data-preset="720">
+                <span class="preset-name">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+                  <span>720p HD</span>
+                </span>
+                <span class="preset-sub">Fast & Compact (MP4)</span>
+              </button>
+              <button type="button" class="btn-preset" data-preset="mp3">
+                <span class="preset-name">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                  <span>MP3 Audio</span>
+                </span>
+                <span class="preset-sub">High Quality Audio Extract</span>
+              </button>
+            </div>
+
+            <!-- Custom Presets Row & Save Action -->
+            <div class="custom-presets-bar">
+              <div id="custom-presets-list" class="custom-presets-list"></div>
+              <button type="button" id="btn-save-preset" class="btn-tool-sm" title="Save current settings as a custom preset">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <span>Save as Preset</span>
+              </button>
+            </div>
+
+            <!-- Custom Dropdown Settings Panel -->
+            <div class="dropdowns-panel">
+              <div class="controls-grid">
+                <!-- Dropdown: Type -->
+                <div class="control-field">
+                  <label class="field-label" id="lbl-type">Type</label>
+                  <div class="custom-select" id="select-type" tabindex="0" aria-haspopup="listbox" aria-labelledby="lbl-type">
+                    <button type="button" class="select-trigger">
+                      <span class="select-value" data-value="video_audio">Video + Audio</span>
+                      <svg class="select-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                    <ul class="select-dropdown" role="listbox">
+                      <li class="select-option selected" data-value="video_audio" role="option">Video + Audio</li>
+                      <li class="select-option" data-value="audio_only" role="option">Audio only</li>
+                      <li class="select-option" data-value="video_only" role="option">Video only</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <!-- Dropdown: Quality (Video) -->
+                <div class="control-field" id="field-video-quality">
+                  <label class="field-label" id="lbl-quality">Video Quality</label>
+                  <div class="custom-select" id="select-quality" tabindex="0" aria-haspopup="listbox" aria-labelledby="lbl-quality">
+                    <button type="button" class="select-trigger">
+                      <span class="select-value" data-value="best">Best Quality</span>
+                      <svg class="select-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                    <ul class="select-dropdown" id="dropdown-quality-options" role="listbox">
+                      <li class="select-option selected" data-value="best" role="option">Best Quality</li>
+                      <li class="select-option" data-value="2160" role="option">2160p (4K)</li>
+                      <li class="select-option" data-value="1440" role="option">1440p (2K)</li>
+                      <li class="select-option" data-value="1080" role="option">1080p Full HD</li>
+                      <li class="select-option" data-value="720" role="option">720p HD</li>
+                      <li class="select-option" data-value="480" role="option">480p SD</li>
+                      <li class="select-option" data-value="360" role="option">360p</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <!-- Dropdown: Container (Video) -->
+                <div class="control-field" id="field-video-container">
+                  <label class="field-label" id="lbl-container">Container</label>
+                  <div class="custom-select" id="select-container" tabindex="0" aria-haspopup="listbox" aria-labelledby="lbl-container">
+                    <button type="button" class="select-trigger">
+                      <span class="select-value" data-value="mp4">MP4</span>
+                      <svg class="select-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                    <ul class="select-dropdown" role="listbox">
+                      <li class="select-option selected" data-value="mp4" role="option">MP4</li>
+                      <li class="select-option" data-value="mkv" role="option">MKV</li>
+                      <li class="select-option" data-value="webm" role="option">WebM</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <!-- Dropdown: Audio Format (hidden if video only) -->
+                <div class="control-field" id="field-audio-format" hidden>
+                  <label class="field-label" id="lbl-audio-fmt">Audio Format</label>
+                  <div class="custom-select" id="select-audio-format" tabindex="0" aria-haspopup="listbox" aria-labelledby="lbl-audio-fmt">
+                    <button type="button" class="select-trigger">
+                      <span class="select-value" data-value="mp3">MP3</span>
+                      <svg class="select-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                    <ul class="select-dropdown" role="listbox">
+                      <li class="select-option selected" data-value="mp3" role="option">MP3</li>
+                      <li class="select-option" data-value="m4a" role="option">M4A</li>
+                      <li class="select-option" data-value="opus" role="option">Opus</li>
+                      <li class="select-option" data-value="flac" role="option">FLAC</li>
+                      <li class="select-option" data-value="wav" role="option">WAV</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <!-- Dropdown: Audio Quality (Bitrate) -->
+                <div class="control-field" id="field-audio-quality" hidden>
+                  <label class="field-label" id="lbl-audio-q">Audio Quality</label>
+                  <div class="custom-select" id="select-audio-quality" tabindex="0" aria-haspopup="listbox" aria-labelledby="lbl-audio-q">
+                    <button type="button" class="select-trigger">
+                      <span class="select-value" data-value="best">Best Quality</span>
+                      <svg class="select-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                    <ul class="select-dropdown" role="listbox">
+                      <li class="select-option selected" data-value="best" role="option">Best Quality</li>
+                      <li class="select-option" data-value="320" role="option">320 kbps (High)</li>
+                      <li class="select-option" data-value="192" role="option">192 kbps (Standard)</li>
+                      <li class="select-option" data-value="128" role="option">128 kbps (Compact)</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <!-- Dropdown: Subtitles -->
+                <div class="control-field" id="field-subtitles">
+                  <label class="field-label">Subtitles</label>
+                  <div class="custom-multiselect" id="select-subtitles" tabindex="0">
+                    <button type="button" class="multiselect-trigger">
+                      <span class="multiselect-value" id="subtitles-display">None</span>
+                      <svg class="select-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                    <div class="multiselect-dropdown" id="subtitles-dropdown">
+                      <div class="multiselect-mode-row">
+                        <label class="radio-label">
+                          <input type="radio" name="sub-mode" value="embed" checked />
+                          <span>Embed in video</span>
+                        </label>
+                        <label class="radio-label">
+                          <input type="radio" name="sub-mode" value="separate" />
+                          <span>Separate file</span>
+                        </label>
+                      </div>
+                      <div class="multiselect-items" id="subtitles-items-list">
+                        <label class="multiselect-item">
+                          <input type="checkbox" value="en" />
+                          <span>English (en)</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Exported Filename (Optional Custom Override) -->
+            <div class="filename-control-card">
+              <div class="filename-control-header">
+                <label for="input-custom-filename" class="filename-control-label">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                  </svg>
+                  <span>Exported File Name</span>
+                </label>
+                <span class="filename-control-hint">Leave blank to use default template</span>
+              </div>
+              <div class="filename-input-wrap">
+                <input
+                  type="text"
+                  id="input-custom-filename"
+                  class="custom-filename-input"
+                  placeholder="Auto (uses default naming template)"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <button type="button" id="btn-clear-custom-filename" class="btn-clear-filename" title="Clear custom name" aria-label="Clear custom name" hidden>✕</button>
+              </div>
+              <div class="filename-preview-sub">
+                <span class="preview-sub-label">Preview:</span>
+                <code id="lbl-live-filename" class="filename-preview-code">video.mp4</code>
+              </div>
+            </div>
+
+            <!-- Clip & Trim Section (Optional) -->
+            <details class="feature-accordion" id="clip-section">
+              <summary class="feature-summary">
+                <span class="summary-title-wrap">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="6" cy="6" r="3"></circle>
+                    <circle cx="6" cy="18" r="3"></circle>
+                    <line x1="20" y1="4" x2="8.12" y2="15.88"></line>
+                    <line x1="14.47" y1="14.48" x2="20" y2="20"></line>
+                    <line x1="8.12" y1="8.12" x2="12" y2="12"></line>
+                  </svg>
+                  <span>Clip / Trim Section (Optional)</span>
+                  <span id="clip-active-badge" class="badge-active" hidden>Active</span>
+                </span>
+                <svg class="select-chevron summary-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </summary>
+              <div class="feature-body">
+                <div class="clip-controls-row">
+                  <div class="clip-input-group">
+                    <label class="field-label" for="clip-start">Start Time</label>
+                    <input type="text" id="clip-start" class="text-input-sm" placeholder="00:00:00" />
+                  </div>
+                  <div class="clip-input-group">
+                    <label class="field-label" for="clip-end">End Time</label>
+                    <input type="text" id="clip-end" class="text-input-sm" placeholder="00:00:00" />
+                  </div>
+                  <button type="button" id="btn-reset-clip" class="btn-tool-sm">Reset</button>
+                </div>
+                <div class="clip-sliders-wrap">
+                  <input type="range" id="clip-slider-start" min="0" max="100" value="0" class="timeline-slider" />
+                  <input type="range" id="clip-slider-end" min="0" max="100" value="100" class="timeline-slider" />
+                </div>
+                <p class="field-hint">Downloads only the selected section using <code>--download-sections</code> without re-encoding the rest.</p>
+              </div>
+            </details>
+
+            <!-- Audio Extras & Metadata Editor -->
+            <details class="feature-accordion" id="audio-extras-section">
+              <summary class="feature-summary">
+                <span class="summary-title-wrap">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                    <line x1="12" y1="19" x2="12" y2="23"></line>
+                    <line x1="8" y1="23" x2="16" y2="23"></line>
+                  </svg>
+                  <span>Audio Extras & Metadata Editor</span>
+                </span>
+                <svg class="select-chevron summary-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </summary>
+              <div class="feature-body">
+                <label class="toggle-control" id="opt-audio-normalize">
+                  <input type="checkbox" id="chk-audio-normalize" />
+                  <span class="toggle-slider"></span>
+                  <span class="toggle-label">Loudness Normalization (EBU R128 standard audio filter)</span>
+                </label>
+                <div class="metadata-grid">
+                  <div class="meta-input-group">
+                    <label class="field-label" for="meta-title">Title</label>
+                    <input type="text" id="meta-title" class="text-input-sm" placeholder="Prefilled from video title" />
+                  </div>
+                  <div class="meta-input-group">
+                    <label class="field-label" for="meta-artist">Artist / Channel</label>
+                    <input type="text" id="meta-artist" class="text-input-sm" placeholder="Channel / Artist name" />
+                  </div>
+                  <div class="meta-input-group">
+                    <label class="field-label" for="meta-album">Album</label>
+                    <input type="text" id="meta-album" class="text-input-sm" placeholder="Album / Playlist name" />
+                  </div>
+                </div>
+              </div>
+            </details>
+
+            <!-- Options: Modern Toggle Switches -->
+            <div class="section-divider">
+              <span class="divider-text">Options</span>
+            </div>
+
+            <div class="options-grid">
+              <label class="toggle-control" id="opt-embed-thumb">
+                <input type="checkbox" id="chk-embed-thumb" checked />
+                <span class="toggle-slider"></span>
+                <span class="toggle-label">Embed thumbnail</span>
+              </label>
+
+              <label class="toggle-control" id="opt-embed-meta">
+                <input type="checkbox" id="chk-embed-meta" checked />
+                <span class="toggle-slider"></span>
+                <span class="toggle-label">Embed metadata</span>
+              </label>
+
+              <label class="toggle-control" id="opt-embed-chapters">
+                <input type="checkbox" id="chk-embed-chapters" checked />
+                <span class="toggle-slider"></span>
+                <span class="toggle-label">Embed chapters</span>
+              </label>
+
+              <label class="toggle-control" id="opt-save-thumb">
+                <input type="checkbox" id="chk-save-thumb" />
+                <span class="toggle-slider"></span>
+                <span class="toggle-label">Save thumbnail as image</span>
+              </label>
+
+              <label class="toggle-control" id="opt-sponsorblock">
+                <input type="checkbox" id="chk-sponsorblock" />
+                <span class="toggle-slider"></span>
+                <span class="toggle-label">SponsorBlock removal</span>
+              </label>
+            </div>
+
+            <!-- SponsorBlock Categories (collapsible when toggle checked) -->
+            <div id="sponsorblock-categories" class="sponsorblock-box" hidden>
+              <span class="field-label">Remove categories:</span>
+              <div class="categories-chips">
+                <label class="chip-checkbox">
+                  <input type="checkbox" value="sponsor" checked />
+                  <span>Sponsor</span>
+                </label>
+                <label class="chip-checkbox">
+                  <input type="checkbox" value="intro" checked />
+                  <span>Intro</span>
+                </label>
+                <label class="chip-checkbox">
+                  <input type="checkbox" value="outro" checked />
+                  <span>Outro</span>
+                </label>
+                <label class="chip-checkbox">
+                  <input type="checkbox" value="selfpromo" checked />
+                  <span>Self-Promotion</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Primary Action Row -->
+            <div class="action-footer">
+              <button id="btn-add-queue" class="btn-primary-lg">
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="8 17 12 21 16 17"></polyline>
+                  <line x1="12" y1="12" x2="12" y2="21"></line>
+                  <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"></path>
+                </svg>
+                <span id="btn-add-text">Add Video to Queue</span>
+              </button>
+              <button id="btn-open-downloads" class="btn-secondary-lg" title="Open YouTube downloads folder in Explorer">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span>Open Folder</span>
+              </button>
+            </div>
+          </section>
+        </div>
+
+        <!-- Right Column: Sticky Preview & Playlist Card -->
+        <div class="download-preview-col">
+          <div class="sticky-preview-wrapper">
+            <!-- Preview Placeholder (shown when nothing is loaded) -->
+            <div id="preview-placeholder" class="card preview-placeholder-card">
+              <div class="placeholder-icon">
+                <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="2" y="4" width="20" height="15" rx="2.5"></rect>
+                  <polygon points="10,8 16,11.5 10,15" fill="currentColor"></polygon>
+                </svg>
+              </div>
+              <h3 class="placeholder-title">No Video Loaded</h3>
+              <p class="placeholder-sub">Paste a YouTube link on the left to preview video details, available qualities, and estimated file size.</p>
+            </div>
+
+            <!-- Skeleton Loader -->
+            <div id="preview-skeleton" class="card preview-skeleton" hidden>
+              <div class="skeleton-thumb"></div>
+              <div class="skeleton-text">
+                <div class="skeleton-line long"></div>
+                <div class="skeleton-line med"></div>
+                <div class="skeleton-line short"></div>
+              </div>
+            </div>
+
+            <!-- Error Card -->
+            <div id="preview-error" class="card preview-error" hidden>
+              <div class="error-icon">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+              </div>
+              <div class="error-msg" id="preview-error-msg">Could not fetch video info.</div>
+            </div>
+
+            <!-- Video Preview Card -->
+            <div id="video-preview" class="card video-preview-card" hidden>
+              <div class="preview-thumb-wrap">
+                <img id="preview-thumb" src="" alt="Thumbnail" />
+                <span id="preview-duration" class="preview-duration">00:00</span>
+              </div>
+              <div class="preview-meta">
+                <h2 id="preview-title" class="preview-title">Video Title</h2>
+                <div class="preview-submeta">
+                  <span id="preview-author" class="meta-pill author">Channel</span>
+                  <span id="preview-views" class="meta-pill">0 views</span>
+                  <span id="preview-date" class="meta-pill">Date</span>
+                </div>
+                <!-- Live Estimated Size -->
+                <div class="preview-est-size-row">
+                  <span class="meta-label">Est. File Size:</span>
+                  <span id="preview-est-size" class="est-size-pill">--</span>
+                </div>
+                <div class="preview-qualities-available">
+                  <span class="meta-label">Available Qualities:</span>
+                  <div id="preview-qualities-list" class="qualities-chips"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Playlist Card Preview -->
+            <div id="playlist-preview" class="card playlist-preview-card" hidden>
+              <div class="playlist-header">
+                <div class="playlist-title-wrap">
+                  <div class="playlist-icon-badge">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="8" y1="6" x2="21" y2="6"></line>
+                      <line x1="8" y1="12" x2="21" y2="12"></line>
+                      <line x1="8" y1="18" x2="21" y2="18"></line>
+                      <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                      <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                      <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 id="playlist-title" class="playlist-title">Playlist Title</h3>
+                    <p id="playlist-count" class="playlist-count">0 videos found</p>
+                  </div>
+                </div>
+                <div class="playlist-controls">
+                  <button id="btn-playlist-select-all" class="btn-tool-sm">Select All</button>
+                  <button id="btn-playlist-select-none" class="btn-tool-sm">Select None</button>
+                </div>
+              </div>
+
+              <div class="playlist-range-row">
+                <label class="range-label">Range: Items</label>
+                <input type="number" id="playlist-range-start" class="range-input" min="1" placeholder="1" />
+                <span>to</span>
+                <input type="number" id="playlist-range-end" class="range-input" min="1" placeholder="All" />
+                <button id="btn-playlist-apply-range" class="btn-tool-sm">Apply Range</button>
+              </div>
+
+              <div class="playlist-items-scroll">
+                <ul id="playlist-items-list" class="playlist-items-list"></ul>
+              </div>
+
+              <div class="playlist-options-row">
+                <label class="toggle-control">
+                  <input type="checkbox" id="chk-playlist-numbering" checked />
+                  <span class="toggle-slider"></span>
+                  <span class="toggle-label">Number files (01, 02…)</span>
+                </label>
+                <label class="toggle-control">
+                  <input type="checkbox" id="chk-playlist-subfolder" checked />
+                  <span class="toggle-slider"></span>
+                  <span class="toggle-label">Save in folder</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════════════════════════
+         TAB 2: DOWNLOAD QUEUE
+    ═════════════════════════════════════════════════════════════════════════ -->
+    <div id="tab-queue" class="tab-pane" role="tabpanel" hidden>
+      <section class="card">
+        <div class="card-header">
+          <div class="header-title-group">
+            <h2>Download Queue</h2>
+            <span id="queue-status-summary" class="badge">0 items</span>
+            <span id="queue-global-stats" class="queue-global-stats" hidden></span>
+          </div>
+          <div class="header-actions-group">
+            <button id="btn-pause-all-queue" class="btn-tool-sm" title="Pause all downloads">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="6" y="4" width="4" height="16"></rect>
+                <rect x="14" y="4" width="4" height="16"></rect>
+              </svg>
+              <span>Pause All</span>
+            </button>
+            <button id="btn-resume-all-queue" class="btn-tool-sm" title="Resume all downloads">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              <span>Resume All</span>
+            </button>
+            <button id="btn-clear-queue-finished" class="btn-tool-sm">Clear Completed</button>
+          </div>
+        </div>
+
+        <div id="queue-empty" class="empty-state">
+          <div class="empty-icon">
+            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M22 12h-6l-2 3h-4l-2-3H2v8a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-8z"></path>
+              <path d="M5.45 5.11L2 12v0"></path>
+              <path d="M22 12l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
+            </svg>
+          </div>
+          <p class="empty-title">Queue is empty</p>
+          <p class="empty-sub">Paste YouTube URLs in the New Download tab to begin.</p>
+        </div>
+
+        <ul id="queue-list" class="queue-list" hidden></ul>
+      </section>
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════════════════════════
+         TAB 3: DOWNLOAD HISTORY
+    ═════════════════════════════════════════════════════════════════════════ -->
+    <div id="tab-history" class="tab-pane" role="tabpanel" hidden>
+      <section class="card">
+        <div class="card-header">
+          <div class="header-title-group">
+            <h2>Download History</h2>
+            <span id="history-total-badge" class="badge">0 items</span>
+          </div>
+          <div class="header-actions-group">
+            <button id="btn-clear-history" class="btn-tool-sm btn-danger-text">Clear History</button>
+          </div>
+        </div>
+
+        <!-- History Filter Bar -->
+        <div class="history-filter-bar">
+          <div class="search-input-wrap">
+            <span class="search-icon">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </span>
+            <input type="text" id="history-search" placeholder="Search history by title…" />
+          </div>
+          <div class="filter-controls">
+            <select id="history-filter-type" class="native-select-sm" aria-label="Filter history by media type">
+              <option value="all">All Media</option>
+              <option value="video">Videos</option>
+              <option value="audio">Audio</option>
+            </select>
+            <select id="history-filter-date" class="native-select-sm" aria-label="Filter history by date">
+              <option value="all">All Time</option>
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+            </select>
+            <select id="history-sort" class="native-select-sm" aria-label="Sort history entries">
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="title">Title (A-Z)</option>
+              <option value="size">Size (Largest)</option>
+            </select>
+            <div class="layout-toggle-group">
+              <button type="button" id="btn-history-list-view" class="btn-icon-toggle active" title="List View" aria-label="List View">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="8" y1="6" x2="21" y2="6"></line>
+                  <line x1="8" y1="12" x2="21" y2="12"></line>
+                  <line x1="8" y1="18" x2="21" y2="18"></line>
+                  <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                  <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                  <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                </svg>
+              </button>
+              <button type="button" id="btn-history-grid-view" class="btn-icon-toggle" title="Grid View" aria-label="Grid View">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="14" width="7" height="7"></rect>
+                  <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- History Bulk Action & Export Toolbar -->
+        <div id="history-bulk-toolbar" class="history-bulk-toolbar">
+          <div class="bulk-left">
+            <label class="bulk-select-all-label">
+              <input type="checkbox" id="chk-history-select-all" />
+              <span id="lbl-history-selected-count">Select all</span>
+            </label>
+            <button type="button" id="btn-bulk-redownload" class="btn-tool-sm" disabled>Re-download Selected</button>
+            <button type="button" id="btn-bulk-delete" class="btn-tool-sm btn-danger-text" disabled>Delete Selected</button>
+          </div>
+          <div class="bulk-right">
+            <button type="button" id="btn-export-history-json" class="btn-tool-sm" title="Export as JSON">Export JSON</button>
+            <button type="button" id="btn-export-history-csv" class="btn-tool-sm" title="Export as CSV">Export CSV</button>
+          </div>
+        </div>
+
+        <div id="history-empty" class="empty-state">
+          <div class="empty-icon">
+            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+          </div>
+          <p class="empty-title">No downloads recorded</p>
+          <p class="empty-sub">Completed downloads will appear here with instant file and folder actions.</p>
+        </div>
+
+        <ul id="history-list" class="history-list" hidden></ul>
+      </section>
+    </div>
+
+    <!-- App Footer -->
+    <footer class="app-footer">
+      <div class="footer-stats">
+        <span>Storage: <strong id="footer-disk-used">--</strong> used</span>
+        <span>•</span>
+        <span class="footer-target-wrap">
+          <span>Target:</span>
+          <button type="button" id="btn-footer-folder" class="footer-path-btn" title="Click to open download folder in File Explorer">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <code id="footer-folder-path">Downloads\YouTube</code>
+          </button>
+          <button type="button" id="btn-footer-change-folder" class="footer-change-link" title="Change download folder in Settings">change</button>
+        </span>
+      </div>
+      <p class="disclaimer">Only download media you have the legal right to access and store offline.</p>
+    </footer>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════════════════
+       SETTINGS MODAL
+  ═════════════════════════════════════════════════════════════════════════ -->
+  <div id="settings-modal" class="modal-backdrop" hidden>
+    <div class="modal-card" role="dialog" aria-labelledby="settings-heading" aria-modal="true">
+      <div class="modal-header">
+        <h2 id="settings-heading">Settings</h2>
+        <button id="btn-close-settings" class="close-btn" aria-label="Close settings">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Download Folder -->
+        <div class="form-group">
+          <label for="setting-folder" class="field-label">Download Folder</label>
+          <div class="input-with-action">
+            <input type="text" id="setting-folder" class="text-input" spellcheck="false" />
+            <button id="btn-verify-folder" class="btn-tool-sm">Verify / Test</button>
+          </div>
+          <p class="field-hint">Files are saved to this folder on your computer.</p>
+        </div>
+
+        <!-- Filename Template -->
+        <div class="form-group">
+          <label for="setting-template" class="field-label">Filename Template</label>
+          <input type="text" id="setting-template" class="text-input" spellcheck="false" />
+          <div class="template-presets">
+            <span class="field-hint">Presets:</span>
+            <button type="button" class="btn-tag" data-tpl="%(title)s.%(ext)s">Default ({Title}.{ext})</button>
+            <button type="button" class="btn-tag" data-tpl="%(title)s [%(id)s].%(ext)s">Title + ID</button>
+            <button type="button" class="btn-tag" data-tpl="%(uploader)s - %(title)s.%(ext)s">Channel - Title</button>
+            <button type="button" class="btn-tag" data-tpl="%(upload_date)s - %(title)s.%(ext)s">Date - Title</button>
+          </div>
+        </div>
+
+        <!-- Concurrency & Speed -->
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="setting-concurrency" class="field-label">Max Simultaneous Downloads</label>
+            <select id="setting-concurrency" class="native-select">
+              <option value="1">1 download</option>
+              <option value="2">2 simultaneous (Recommended)</option>
+              <option value="3">3 simultaneous</option>
+              <option value="4">4 simultaneous</option>
+            </select>
+          </div>
+
+          <div class="form-group flex-1">
+            <label for="setting-speed" class="field-label">Speed Limit</label>
+            <select id="setting-speed" class="native-select">
+              <option value="">Unlimited</option>
+              <option value="500K">500 KB/s</option>
+              <option value="1M">1 MB/s</option>
+              <option value="2M">2 MB/s</option>
+              <option value="5M">5 MB/s</option>
+              <option value="10M">10 MB/s</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Cookies & Retries -->
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="setting-cookies" class="field-label">Import Browser Cookies</label>
+            <select id="setting-cookies" class="native-select">
+              <option value="none">None (Default)</option>
+              <option value="chrome">Google Chrome</option>
+              <option value="edge">Microsoft Edge</option>
+              <option value="firefox">Mozilla Firefox</option>
+              <option value="brave">Brave</option>
+            </select>
+            <p class="field-hint">Used for videos requiring login or age verification.</p>
+          </div>
+
+          <div class="form-group flex-1">
+            <label for="setting-retries" class="field-label">Max Network Retries</label>
+            <select id="setting-retries" class="native-select">
+              <option value="1">1 retry</option>
+              <option value="3">3 retries (Default)</option>
+              <option value="5">5 retries</option>
+              <option value="10">10 retries</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Toggles -->
+        <div class="form-group">
+          <label class="toggle-control">
+            <input type="checkbox" id="setting-auto-open" />
+            <span class="toggle-slider"></span>
+            <span class="toggle-label">Auto-open folder when download finishes</span>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label class="toggle-control">
+            <input type="checkbox" id="setting-sound" checked />
+            <span class="toggle-slider"></span>
+            <span class="toggle-label">Play subtle chime when download completes</span>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label class="field-label">Theme</label>
+          <div class="theme-picker">
+            <label class="radio-pill">
+              <input type="radio" name="theme-choice" value="system" />
+              <span>💻 System</span>
+            </label>
+            <label class="radio-pill">
+              <input type="radio" name="theme-choice" value="dark" />
+              <span>🌙 Dark</span>
+            </label>
+            <label class="radio-pill">
+              <input type="radio" name="theme-choice" value="light" />
+              <span>☀️ Light</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Settings Backup & Maintenance -->
+        <div class="form-group settings-management-section">
+          <label class="field-label">Settings Backup & Maintenance</label>
+          <div class="settings-btn-row">
+            <button type="button" id="btn-export-settings" class="btn-tool-sm">Export Settings</button>
+            <button type="button" id="btn-import-settings" class="btn-tool-sm">Import Settings</button>
+            <input type="file" id="input-import-settings" accept=".json" style="display:none;" />
+            <button type="button" id="btn-reset-settings" class="btn-tool-sm btn-danger-text">Reset Defaults</button>
+          </div>
+        </div>
+
+        <!-- Quit Server -->
+        <div class="form-group settings-quit-section">
+          <label class="field-label">Quit Application</label>
+          <div class="settings-btn-row">
+            <button type="button" id="btn-quit-server" class="btn-tool-sm btn-danger-text">Quit Server</button>
+          </div>
+          <p class="field-hint">Terminates background server process and stops any running downloads cleanly.</p>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btn-cancel-settings" class="btn-tool">Cancel</button>
+        <button id="btn-save-settings" class="btn-primary-sm">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════════════════
+       RAW LOG VIEWER MODAL
+  ═════════════════════════════════════════════════════════════════════════ -->
+  <div id="log-modal" class="modal-backdrop" hidden>
+    <div class="modal-card modal-lg" role="dialog" aria-labelledby="log-heading" aria-modal="true">
+      <div class="modal-header">
+        <h2 id="log-heading">Task Log Viewer</h2>
+        <button id="btn-close-log" class="close-btn" aria-label="Close log">✕</button>
+      </div>
+      <div class="modal-body">
+        <pre id="log-content-box" class="raw-log-box">Loading task logs…</pre>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-copy-log" class="btn-tool">Copy Log</button>
+        <button id="btn-dismiss-log" class="btn-primary-sm">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════════════════
+       SAVE CUSTOM PRESET MODAL
+  ═════════════════════════════════════════════════════════════════════════ -->
+  <div id="save-preset-modal" class="modal-backdrop" hidden>
+    <div class="modal-card modal-sm" role="dialog" aria-labelledby="preset-modal-heading" aria-modal="true">
+      <div class="modal-header">
+        <h2 id="preset-modal-heading">Save Custom Preset</h2>
+        <button id="btn-close-save-preset" class="close-btn" aria-label="Close dialog">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="input-preset-name" class="field-label">Preset Name</label>
+          <input type="text" id="input-preset-name" class="text-input" placeholder="e.g. My 1080p MP4 / Quick Audio" maxlength="32" />
+          <p class="field-hint">Saves current Type, Quality, Container, Audio Format, and Options to your Quick Presets.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-cancel-save-preset" class="btn-tool">Cancel</button>
+        <button id="btn-confirm-save-preset" class="btn-primary-sm">Save Preset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════════════════
+       DUPLICATE HISTORY CONFIRMATION MODAL
+  ═════════════════════════════════════════════════════════════════════════ -->
+  <div id="duplicate-confirm-modal" class="modal-backdrop" hidden>
+    <div class="modal-card modal-sm" role="dialog" aria-labelledby="dup-modal-heading" aria-modal="true">
+      <div class="modal-header">
+        <h2 id="dup-modal-heading">Already in History</h2>
+        <button id="btn-close-dup" class="close-btn" aria-label="Close dialog">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="dup-alert-wrap">
+          <div class="alert-icon">⚠️</div>
+          <p id="dup-modal-msg" class="dup-modal-text">This video was already downloaded previously. Would you like to re-download it?</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-skip-dup" class="btn-tool">Skip</button>
+        <button id="btn-confirm-dup" class="btn-primary-sm">Re-download</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════════════════
+       MEDIA PREVIEW PLAYER MODAL
+  ═════════════════════════════════════════════════════════════════════════ -->
+  <div id="media-preview-modal" class="modal-backdrop" hidden>
+    <div class="modal-card modal-md" role="dialog" aria-labelledby="media-preview-title" aria-modal="true">
+      <div class="modal-header">
+        <h2 id="media-preview-title" class="truncate-title">Media Preview</h2>
+        <button id="btn-close-media-preview" class="close-btn" aria-label="Close preview">✕</button>
+      </div>
+      <div class="modal-body media-preview-body">
+        <div id="preview-video-container" class="media-container" hidden>
+          <video id="preview-video-player" controls preload="metadata" playsinline class="media-player-el"></video>
+        </div>
+        <div id="preview-audio-container" class="media-container audio-player-wrap" hidden>
+          <div class="audio-wave-anim">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <audio id="preview-audio-player" controls preload="metadata" class="media-player-el"></audio>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-preview-show-folder" class="btn-tool">Show in Folder</button>
+        <button id="btn-preview-open-system" class="btn-tool">Open in Default App</button>
+        <button id="btn-dismiss-media-preview" class="btn-primary-sm">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════════════════
+       KEYBOARD SHORTCUTS HELP MODAL
+  ═════════════════════════════════════════════════════════════════════════ -->
+  <div id="shortcuts-modal" class="modal-backdrop" hidden>
+    <div class="modal-card modal-sm" role="dialog" aria-labelledby="shortcuts-heading" aria-modal="true">
+      <div class="modal-header">
+        <h2 id="shortcuts-heading">Keyboard Shortcuts</h2>
+        <button id="btn-close-shortcuts" class="close-btn" aria-label="Close shortcuts">✕</button>
+      </div>
+      <div class="modal-body">
+        <table class="shortcuts-table">
+          <tbody>
+            <tr><td><kbd>?</kbd></td><td>Open keyboard shortcuts</td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>Close dialogs or dropdowns</td></tr>
+            <tr><td><kbd>Enter</kbd></td><td>Add URL to queue (in input box)</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>1</kbd></td><td>New Download tab</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>2</kbd></td><td>Queue tab</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>3</kbd></td><td>History tab</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>,</kbd></td><td>Settings</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-dismiss-shortcuts" class="btn-primary-sm">Got It</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
