@@ -4,7 +4,7 @@ A clean, local desktop web application for downloading YouTube videos, audio tra
 
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6.svg)](https://microsoft.com/windows)
 [![Node Version](https://img.shields.io/badge/node-%3E%3D%2018.0.0-339933.svg)](https://nodejs.org)
-[![License](https://img.shields.io/badge/license-Pending%20Selection-lightgrey.svg)](#credits-and-licenses)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Purpose](https://img.shields.io/badge/purpose-Educational%20Use-blueviolet.svg)](#disclaimer)
 
 > 😊 **This project is made for educational and personal learning purposes only.**
@@ -364,5 +364,6 @@ This software is developed strictly as an educational project demonstrating mode
 * The software is provided "as is", without warranty of any kind, express or implied.
 
 ### Credits and Licenses
+* **YouTube Video Downloader**: Licensed under the [MIT License](LICENSE).
 * **yt-dlp**: Distributed under the [The Unlicense](https://unlicense.org/) (Public Domain). Special thanks to the `yt-dlp` team for their continuous maintenance of the engine.
 * **FFmpeg**: The standalone installer bundles a Windows 64-bit full build provided by [Gyan.dev](https://www.gyan.dev/ffmpeg/builds/), licensed under the [GNU General Public License v3.0 (GPLv3)](https://www.gnu.org/licenses/gpl-3.0.html).
