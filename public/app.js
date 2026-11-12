@@ -100,8 +100,20 @@
   const clipEnd = document.getElementById("clip-end");
   const clipSliderStart = document.getElementById("clip-slider-start");
   const clipSliderEnd = document.getElementById("clip-slider-end");
+  const clipRangeHighlight = document.getElementById("clip-range-highlight");
+  const clipDurationText = document.getElementById("clip-duration-text");
   const btnResetClip = document.getElementById("btn-reset-clip");
+  const btnPreviewCut = document.getElementById("btn-preview-cut");
   const clipActiveBadge = document.getElementById("clip-active-badge");
+
+  const btnPreviewModeThumb = document.getElementById("btn-preview-mode-thumb");
+  const btnPreviewModePlayer = document.getElementById("btn-preview-mode-player");
+  const btnThumbQuickPlay = document.getElementById("btn-thumb-quick-play");
+  const btnSyncPlayerCut = document.getElementById("btn-sync-player-cut");
+  const previewThumbContainer = document.getElementById("preview-thumb-container");
+  const previewPlayerContainer = document.getElementById("preview-player-container");
+  const previewIframe = document.getElementById("preview-iframe");
+  const playerClipRangeText = document.getElementById("player-clip-range-text");
 
   const chkAudioNormalize = document.getElementById("chk-audio-normalize");
   const metaTitle = document.getElementById("meta-title");
@@ -929,6 +941,7 @@
   async function handleUrlInput() {
     const raw = urlInput.value.trim();
     if (!raw) {
+      setPreviewMode("thumb");
       if (videoPreview) videoPreview.hidden = true;
       if (playlistPreview) playlistPreview.hidden = true;
       if (batchPreview) batchPreview.hidden = true;
@@ -940,6 +953,7 @@
     const lines = raw.split("\n").map((l) => l.trim()).filter((l) => Boolean(l) && isYouTubeUrl(l));
 
     if (lines.length === 0) {
+      setPreviewMode("thumb");
       if (videoPreview) videoPreview.hidden = true;
       if (playlistPreview) playlistPreview.hidden = true;
       if (batchPreview) batchPreview.hidden = true;
@@ -1182,8 +1196,10 @@
         clipSliderEnd.value = data.duration;
         if (clipStart) clipStart.value = "00:00";
         if (clipEnd) clipEnd.value = formatDuration(data.duration);
+        updateDualSliderUI();
       }
       checkClipBadge();
+      setPreviewMode("thumb");
 
       if (previewPlaceholder) previewPlaceholder.hidden = true;
       videoPreview.hidden = false;
@@ -1445,48 +1461,204 @@
     if (clipActiveBadge) clipActiveBadge.hidden = !isClipActive();
   }
 
+  function updateDualSliderUI() {
+    if (!clipSliderStart || !clipSliderEnd) return;
+    const maxVal = parseFloat(clipSliderStart.max) || 100;
+    const sVal = parseFloat(clipSliderStart.value) || 0;
+    const eVal = parseFloat(clipSliderEnd.value) || maxVal;
+
+    if (clipRangeHighlight && maxVal > 0) {
+      const leftPct = (sVal / maxVal) * 100;
+      const rightPct = (eVal / maxVal) * 100;
+      clipRangeHighlight.style.left = `${leftPct}%`;
+      clipRangeHighlight.style.width = `${Math.max(0, rightPct - leftPct)}%`;
+    }
+
+    if (clipDurationText) {
+      const diffSec = Math.max(0, Math.round(eVal - sVal));
+      if (sVal === 0 && (eVal >= maxVal || Math.abs(eVal - maxVal) < 1)) {
+        clipDurationText.textContent = `Full Video (${formatDuration(diffSec)})`;
+      } else {
+        clipDurationText.textContent = `${formatDuration(diffSec)} (${formatDuration(sVal)} → ${formatDuration(eVal)})`;
+      }
+    }
+
+    if (playerClipRangeText) {
+      const duration = activeVideoInfo ? activeVideoInfo.duration : 0;
+      if (sVal > 0 || (eVal > 0 && eVal < duration)) {
+        playerClipRangeText.textContent = `${formatDuration(sVal)} → ${eVal > 0 ? formatDuration(eVal) : "End"}`;
+      } else {
+        playerClipRangeText.textContent = `Full Video (${formatDuration(duration || 0)})`;
+      }
+    }
+  }
+
+  function getActiveVideoId() {
+    if (activeVideoInfo && activeVideoInfo.id) return activeVideoInfo.id;
+    const raw = urlInput ? urlInput.value.trim().split("\n")[0].trim() : "";
+    if (!raw) return null;
+    try {
+      const u = new URL(raw);
+      if (u.hostname === "youtu.be") return u.pathname.slice(1).split("?")[0];
+      return u.searchParams.get("v");
+    } catch {
+      return null;
+    }
+  }
+
+  let activePreviewMode = "thumb";
+
+  function setPreviewMode(mode, autoplay = false) {
+    activePreviewMode = mode;
+    const isPlayer = mode === "player";
+
+    if (btnPreviewModeThumb) {
+      btnPreviewModeThumb.classList.toggle("active", !isPlayer);
+      btnPreviewModeThumb.setAttribute("aria-selected", !isPlayer ? "true" : "false");
+    }
+    if (btnPreviewModePlayer) {
+      btnPreviewModePlayer.classList.toggle("active", isPlayer);
+      btnPreviewModePlayer.setAttribute("aria-selected", isPlayer ? "true" : "false");
+    }
+    if (previewThumbContainer) previewThumbContainer.hidden = isPlayer;
+    if (previewPlayerContainer) previewPlayerContainer.hidden = !isPlayer;
+    if (btnSyncPlayerCut) btnSyncPlayerCut.hidden = !isPlayer;
+
+    if (isPlayer) {
+      loadPreviewPlayerIframe(autoplay);
+    } else {
+      if (previewIframe) previewIframe.src = "";
+    }
+  }
+
+  function loadPreviewPlayerIframe(autoplay = true) {
+    const videoId = getActiveVideoId();
+    if (!videoId || !previewIframe) return;
+
+    const startSec = parseDurationToSeconds(clipStart ? clipStart.value : "0");
+    const duration = activeVideoInfo ? activeVideoInfo.duration : 0;
+    const endSec = parseDurationToSeconds(clipEnd ? clipEnd.value : "");
+
+    let embedUrl = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?enablejsapi=1&rel=0&playsinline=1`;
+    if (startSec > 0) {
+      embedUrl += `&start=${Math.floor(startSec)}`;
+    }
+    if (endSec > 0 && (!duration || endSec < duration)) {
+      embedUrl += `&end=${Math.floor(endSec)}`;
+    }
+    if (autoplay) {
+      embedUrl += `&autoplay=1`;
+    }
+
+    previewIframe.src = embedUrl;
+
+    if (playerClipRangeText) {
+      if (startSec > 0 || (endSec > 0 && endSec < duration)) {
+        playerClipRangeText.textContent = `${formatDuration(startSec)} → ${endSec > 0 ? formatDuration(endSec) : "End"}`;
+      } else {
+        playerClipRangeText.textContent = `Full Video (${formatDuration(duration || 0)})`;
+      }
+    }
+  }
+
   function setupClipControls() {
     if (!clipSliderStart || !clipSliderEnd) return;
 
-    function syncSliders() {
-      const sVal = parseInt(clipSliderStart.value, 10);
-      const eVal = parseInt(clipSliderEnd.value, 10);
+    clipSliderStart.addEventListener("input", () => {
+      let sVal = parseFloat(clipSliderStart.value) || 0;
+      let eVal = parseFloat(clipSliderEnd.value) || 0;
       if (sVal > eVal) {
         clipSliderStart.value = eVal;
+        sVal = eVal;
       }
-      clipStart.value = formatDuration(clipSliderStart.value);
-      clipEnd.value = formatDuration(clipSliderEnd.value);
-      checkClipBadge();
-      triggerCommandPreviewUpdate();
-    }
-
-    clipSliderStart.addEventListener("input", syncSliders);
-    clipSliderEnd.addEventListener("input", syncSliders);
-
-    clipStart.addEventListener("input", () => {
+      clipSliderStart.style.zIndex = "4";
+      clipSliderEnd.style.zIndex = "3";
+      if (clipStart) clipStart.value = formatDuration(sVal);
+      updateDualSliderUI();
       checkClipBadge();
       triggerCommandPreviewUpdate();
     });
 
-    clipEnd.addEventListener("input", () => {
+    clipSliderEnd.addEventListener("input", () => {
+      let sVal = parseFloat(clipSliderStart.value) || 0;
+      let eVal = parseFloat(clipSliderEnd.value) || 0;
+      if (eVal < sVal) {
+        clipSliderEnd.value = sVal;
+        eVal = sVal;
+      }
+      clipSliderEnd.style.zIndex = "4";
+      clipSliderStart.style.zIndex = "3";
+      if (clipEnd) clipEnd.value = formatDuration(eVal);
+      updateDualSliderUI();
       checkClipBadge();
       triggerCommandPreviewUpdate();
     });
 
-    if (btnResetClip) {
-      btnResetClip.addEventListener("click", () => {
-        if (clipSliderStart) clipSliderStart.value = 0;
-        if (clipStart) clipStart.value = "00:00";
-        if (activeVideoInfo && activeVideoInfo.duration) {
-          if (clipSliderEnd) clipSliderEnd.value = activeVideoInfo.duration;
-          if (clipEnd) clipEnd.value = formatDuration(activeVideoInfo.duration);
-        } else {
-          if (clipEnd) clipEnd.value = "";
+    if (clipStart) {
+      clipStart.addEventListener("input", () => {
+        const sSec = parseDurationToSeconds(clipStart.value);
+        const maxVal = parseFloat(clipSliderStart.max) || 100;
+        const eVal = parseFloat(clipSliderEnd.value) || maxVal;
+        if (!isNaN(sSec) && sSec >= 0 && sSec <= eVal) {
+          clipSliderStart.value = sSec;
+          updateDualSliderUI();
         }
         checkClipBadge();
         triggerCommandPreviewUpdate();
       });
     }
+
+    if (clipEnd) {
+      clipEnd.addEventListener("input", () => {
+        const eSec = parseDurationToSeconds(clipEnd.value);
+        const maxVal = parseFloat(clipSliderEnd.max) || 100;
+        const sVal = parseFloat(clipSliderStart.value) || 0;
+        if (!isNaN(eSec) && eSec >= sVal && eSec <= maxVal) {
+          clipSliderEnd.value = eSec;
+          updateDualSliderUI();
+        }
+        checkClipBadge();
+        triggerCommandPreviewUpdate();
+      });
+    }
+
+    if (btnResetClip) {
+      btnResetClip.addEventListener("click", () => {
+        const maxVal = activeVideoInfo && activeVideoInfo.duration ? activeVideoInfo.duration : 100;
+        if (clipSliderStart) clipSliderStart.value = 0;
+        if (clipSliderEnd) clipSliderEnd.value = maxVal;
+        if (clipStart) clipStart.value = "00:00";
+        if (clipEnd) clipEnd.value = formatDuration(maxVal);
+        updateDualSliderUI();
+        checkClipBadge();
+        triggerCommandPreviewUpdate();
+        if (activePreviewMode === "player") {
+          loadPreviewPlayerIframe(true);
+        }
+      });
+    }
+
+    // Video Preview Player controls
+    if (btnPreviewModeThumb) {
+      btnPreviewModeThumb.addEventListener("click", () => setPreviewMode("thumb"));
+    }
+    if (btnPreviewModePlayer) {
+      btnPreviewModePlayer.addEventListener("click", () => setPreviewMode("player", true));
+    }
+    if (btnThumbQuickPlay) {
+      btnThumbQuickPlay.addEventListener("click", () => setPreviewMode("player", true));
+    }
+    if (btnPreviewCut) {
+      btnPreviewCut.addEventListener("click", () => {
+        if (videoPreview) videoPreview.hidden = false;
+        setPreviewMode("player", true);
+      });
+    }
+    if (btnSyncPlayerCut) {
+      btnSyncPlayerCut.addEventListener("click", () => loadPreviewPlayerIframe(true));
+    }
+
+    updateDualSliderUI();
   }
 
   // ── Custom Presets Manager ───────────────────────────────────────────────────
@@ -1818,6 +1990,7 @@
           validateUrlLines();
           videoPreview.hidden = true;
           playlistPreview.hidden = true;
+          setPreviewMode("thumb");
           if (batchPreview) batchPreview.hidden = true;
           activeVideoInfo = null;
           activePlaylistInfo = null;

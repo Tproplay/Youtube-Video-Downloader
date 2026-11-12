@@ -385,11 +385,25 @@
                     <label class="field-label" for="clip-end">End Time</label>
                     <input type="text" id="clip-end" class="text-input-sm" placeholder="00:00:00" />
                   </div>
-                  <button type="button" id="btn-reset-clip" class="btn-tool-sm">Reset</button>
+                  <div class="clip-actions-group">
+                    <button type="button" id="btn-preview-cut" class="btn-tool-sm" title="Watch and preview this cut in the video player">
+                      <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+                      <span>Preview Cut</span>
+                    </button>
+                    <button type="button" id="btn-reset-clip" class="btn-tool-sm" title="Reset to full video">Reset</button>
+                  </div>
                 </div>
                 <div class="clip-sliders-wrap">
-                  <input type="range" id="clip-slider-start" min="0" max="100" value="0" class="timeline-slider" />
-                  <input type="range" id="clip-slider-end" min="0" max="100" value="100" class="timeline-slider" />
+                  <div class="dual-range-container">
+                    <div class="dual-range-track"></div>
+                    <div id="clip-range-highlight" class="dual-range-highlight"></div>
+                    <input type="range" id="clip-slider-start" min="0" max="100" value="0" class="dual-range-input" aria-label="Start time" />
+                    <input type="range" id="clip-slider-end" min="0" max="100" value="100" class="dual-range-input" aria-label="End time" />
+                  </div>
+                  <div id="clip-duration-indicator" class="clip-duration-indicator">
+                    <span class="clip-duration-label">Selected Clip:</span>
+                    <span id="clip-duration-text" class="clip-duration-val">Full Video</span>
+                  </div>
                 </div>
                 <p class="field-hint">Downloads only the selected section using <code>--download-sections</code> without re-encoding the rest.</p>
               </div>
@@ -551,9 +565,46 @@
 
             <!-- Video Preview Card -->
             <div id="video-preview" class="card video-preview-card" hidden>
-              <div class="preview-thumb-wrap">
-                <img id="preview-thumb" src="" alt="Thumbnail" />
-                <span id="preview-duration" class="preview-duration">00:00</span>
+              <!-- Top Preview Mode Switcher (Thumbnail vs Interactive Player) -->
+              <div class="preview-mode-bar">
+                <div class="preview-mode-tabs" role="tablist">
+                  <button type="button" id="btn-preview-mode-thumb" class="preview-mode-btn active" role="tab" aria-selected="true">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <span>Thumbnail</span>
+                  </button>
+                  <button type="button" id="btn-preview-mode-player" class="preview-mode-btn" role="tab" aria-selected="false">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    <span>Watch Preview</span>
+                  </button>
+                </div>
+                <button type="button" id="btn-sync-player-cut" class="btn-sync-cut" title="Refresh player with current Start/End cut" hidden>
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                  <span>Sync Cut</span>
+                </button>
+              </div>
+
+              <!-- Media Viewport -->
+              <div class="preview-viewport">
+                <!-- 1. Thumbnail View -->
+                <div id="preview-thumb-container" class="preview-thumb-wrap">
+                  <img id="preview-thumb" src="" alt="Thumbnail" />
+                  <span id="preview-duration" class="preview-duration">00:00</span>
+                  <button type="button" id="btn-thumb-quick-play" class="thumb-play-overlay" title="Play preview of video / clip">
+                    <span class="play-icon-circle">
+                      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+                    </span>
+                    <span class="play-icon-label">Preview Video</span>
+                  </button>
+                </div>
+
+                <!-- 2. Embedded Video Player View -->
+                <div id="preview-player-container" class="preview-player-wrap" hidden>
+                  <iframe id="preview-iframe" class="preview-iframe" src="" title="YouTube Video Preview" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                  <div class="player-clip-status" id="player-clip-status">
+                    <span class="player-clip-tag">Clip Cut:</span>
+                    <span id="player-clip-range-text" class="player-clip-range">Full Video</span>
+                  </div>
+                </div>
               </div>
               <div class="preview-meta">
                 <h2 id="preview-title" class="preview-title">Video Title</h2>
