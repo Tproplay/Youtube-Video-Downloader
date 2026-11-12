@@ -53,6 +53,19 @@ $s2.Save()
 Write-Host "[OK] Desktop shortcut created:"
 Write-Host "     $desktopShortcut"
 
+# 4. Refresh Windows Explorer Icon Cache
+try {
+    Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public class ShellNotifier {
+    [DllImport("shell32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    public static extern void SHChangeNotify(uint wEventId, uint uFlags, IntPtr dwItem1, IntPtr dwItem2);
+}
+"@
+    [ShellNotifier]::SHChangeNotify(0x08000000, 0, [IntPtr]::Zero, [IntPtr]::Zero)
+} catch {}
+
 Write-Host ""
 Write-Host "============================================================"
 Write-Host " Installation Complete!"
