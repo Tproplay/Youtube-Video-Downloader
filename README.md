@@ -22,12 +22,6 @@ A clean, local desktop web application for downloading YouTube videos, audio tra
   <img src="docs/screenshot-history.png" alt="History and Media Player" width="85%" />
 </p>
 
-> [!TIP]
-> **Recommended Screenshots to Capture:**
-> 1. `docs/screenshot-new-download.png`: The **New Download** view with a video URL entered, showing the video thumbnail, duration badge, available quality options, and the command preview.
-> 2. `docs/screenshot-queue.png`: The **Queue** tab showing active items with live progress bars, speed, ETA, and worker concurrency tags.
-> 3. `docs/screenshot-history.png`: The **History** tab showcasing completed downloads, search/filter controls, and the inline audio/video preview modal.
-
 ---
 
 ## ✨ Features
