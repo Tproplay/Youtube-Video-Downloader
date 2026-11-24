@@ -119,7 +119,7 @@ $stagingData = Join-Path $stagingDir "data"
 New-Item -ItemType Directory -Path $stagingData -Force | Out-Null
 Set-Content -Path (Join-Path $stagingData "queue.json") -Value "[]" -Encoding UTF8
 Set-Content -Path (Join-Path $stagingData "history.json") -Value "[]" -Encoding UTF8
-Set-Content -Path (Join-Path $stagingData "settings.json") -Value '{"filenameTemplate":"%(title)s.%(ext)s","concurrency":2,"maxRetries":3,"theme":"system","browserCookies":"none","autoOpenFolder":false,"defaultFormat":{"type":"video_audio","quality":"best","container":"mp4","audioFormat":"mp3","audioQuality":"best","embedThumbnail":true,"embedMetadata":true,"embedChapters":true,"saveThumbnailImage":false,"sponsorBlock":false}}' -Encoding UTF8
+Set-Content -Path (Join-Path $stagingData "settings.json") -Value '{"filenameTemplate":"%(title)s.%(ext)s","concurrency":2,"maxRetries":3,"theme":"system","browserCookies":"none","autoOpenFolder":false,"playChime":true,"runInBackground":true,"defaultFormat":{"type":"video_audio","quality":"best","container":"mp4","audioFormat":"mp3","audioQuality":"best","embedThumbnail":true,"embedMetadata":true,"embedChapters":true,"saveThumbnailImage":false,"sponsorBlock":false}}' -Encoding UTF8
 
 # 6. Compress staging to payload.zip
 Write-Host "[6/7] Compressing application payload into package archive..."

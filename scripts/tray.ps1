@@ -7,6 +7,8 @@ Add-Type -AssemblyName System.Drawing
 
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
+$appContext = New-Object System.Windows.Forms.ApplicationContext
+
 $notifyIcon = New-Object System.Windows.Forms.NotifyIcon
 $notifyIcon.Text = "YouTube Video Downloader"
 
@@ -20,33 +22,34 @@ if ($IconPath -and (Test-Path $IconPath)) {
     $notifyIcon.Icon = [System.Drawing.SystemIcons]::Application
 }
 
-$contextMenu = New-Object System.Windows.Forms.ContextMenuStrip
+$contextMenu = New-Object System.Windows.Forms.ContextMenu
 
-$openItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$openItem = New-Object System.Windows.Forms.MenuItem
 $openItem.Text = "Open YouTube Downloader"
-$openItem.Font = New-Object System.Drawing.Font($openItem.Font, [System.Drawing.FontStyle]::Bold)
+$openItem.DefaultItem = $true
 $openItem.Add_Click({
     [Console]::Out.WriteLine("OPEN")
     [Console]::Out.Flush()
 })
 
-$separator = New-Object System.Windows.Forms.ToolStripSeparator
+$separator = New-Object System.Windows.Forms.MenuItem
+$separator.Text = "-"
 
-$quitItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$quitItem = New-Object System.Windows.Forms.MenuItem
 $quitItem.Text = "Quit"
 $quitItem.Add_Click({
     [Console]::Out.WriteLine("QUIT")
     [Console]::Out.Flush()
     $notifyIcon.Visible = $false
     $notifyIcon.Dispose()
-    [System.Windows.Forms.Application]::Exit()
+    $appContext.ExitThread()
 })
 
-$null = $contextMenu.Items.Add($openItem)
-$null = $contextMenu.Items.Add($separator)
-$null = $contextMenu.Items.Add($quitItem)
+$null = $contextMenu.MenuItems.Add($openItem)
+$null = $contextMenu.MenuItems.Add($separator)
+$null = $contextMenu.MenuItems.Add($quitItem)
 
-$notifyIcon.ContextMenuStrip = $contextMenu
+$notifyIcon.ContextMenu = $contextMenu
 $notifyIcon.Add_DoubleClick({
     [Console]::Out.WriteLine("OPEN")
     [Console]::Out.Flush()
@@ -65,7 +68,7 @@ $timer.Add_Tick({
             $timer.Stop()
             $notifyIcon.Visible = $false
             $notifyIcon.Dispose()
-            [System.Windows.Forms.Application]::Exit()
+            $appContext.ExitThread()
             return
         }
         $script:readTask = [Console]::In.ReadLineAsync()
@@ -73,7 +76,7 @@ $timer.Add_Tick({
 })
 $timer.Start()
 
-[System.Windows.Forms.Application]::Run()
+[System.Windows.Forms.Application]::Run($appContext)
 
 if ($notifyIcon) {
     $notifyIcon.Visible = $false
