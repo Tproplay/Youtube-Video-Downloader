@@ -15,6 +15,7 @@ const { exec, spawn, spawnSync } = require("child_process");
 const logger = require("./lib/logger");
 const store = require("./lib/store");
 const ytdlp = require("./lib/ytdlp");
+const tray = require("./lib/tray");
 const { handleRequest } = require("./lib/routes");
 
 const HOST = "127.0.0.1";
@@ -29,6 +30,9 @@ try {
 
 let activeServer = null;
 let browserOpened = false;
+let hasHadClient = false;
+let closeShutdownTimer = null;
+let isShuttingDown = false;
 
 function cleanPidFiles() {
   try {
@@ -136,9 +140,8 @@ function killProcessTree(pid) {
   } catch {}
 }
 
-function openBrowserOnce(url) {
-  if (browserOpened || process.env.NODE_ENV === "test") return;
-  browserOpened = true;
+function openBrowserWindow(url) {
+  if (process.env.NODE_ENV === "test") return;
 
   if (process.platform === "win32") {
     // Check for Edge or Chrome to run in standalone desktop app window mode (--app=)
@@ -190,6 +193,12 @@ function openBrowserOnce(url) {
   } else {
     exec(`xdg-open "${url}"`);
   }
+}
+
+function openBrowserOnce(url) {
+  if (browserOpened || process.env.NODE_ENV === "test") return;
+  browserOpened = true;
+  openBrowserWindow(url);
 }
 
 async function handleExistingInstance() {
@@ -298,6 +307,37 @@ function startServer(port, maxAttempts = 10) {
       logger.warn(`[ffmpeg] WARNING: ffmpeg was not found (required for 1080p+ merging and MP3 conversion)`);
     }
 
+    // Start system tray icon & window close lifecycle watcher
+    const queue = require("./lib/queue");
+    tray.startTray({
+      onOpen: () => openBrowserWindow(url),
+      onQuit: () => gracefulShutdown("TRAY_QUIT"),
+    });
+
+    queue.onClientCountChange((count) => {
+      if (count > 0) {
+        hasHadClient = true;
+        if (closeShutdownTimer) {
+          clearTimeout(closeShutdownTimer);
+          closeShutdownTimer = null;
+        }
+      } else if (hasHadClient && !isShuttingDown) {
+        if (closeShutdownTimer) clearTimeout(closeShutdownTimer);
+        closeShutdownTimer = setTimeout(() => {
+          closeShutdownTimer = null;
+          if (queue.getClientCount() === 0 && !isShuttingDown) {
+            const currentSettings = store.getSettings();
+            if (!currentSettings.runInBackground) {
+              gracefulShutdown("WINDOW_CLOSED");
+            } else {
+              logger.info("[Server] Window closed; continuing to run in background (system tray active).");
+            }
+          }
+        }, 2500);
+        closeShutdownTimer.unref();
+      }
+    });
+
     // Launch browser exactly once
     openBrowserOnce(url);
   };
@@ -309,10 +349,22 @@ function startServer(port, maxAttempts = 10) {
 
 // Graceful shutdown helper
 function gracefulShutdown(signal = "QUIT") {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  if (closeShutdownTimer) {
+    clearTimeout(closeShutdownTimer);
+    closeShutdownTimer = null;
+  }
+
   logger.info(`Server shutting down (${signal})…`);
   const queue = require("./lib/queue");
   try {
     queue.killAll(); // Kill all running yt-dlp child processes
+  } catch {}
+
+  try {
+    tray.stopTray();
   } catch {}
 
   cleanPidFiles();

@@ -112,6 +112,7 @@ $stagingScripts = Join-Path $stagingDir "scripts"
 New-Item -ItemType Directory -Path $stagingScripts -Force | Out-Null
 Copy-Item -Path (Join-Path $projectDir "scripts\install-shortcut.ps1") -Destination $stagingScripts -Force
 Copy-Item -Path (Join-Path $projectDir "scripts\uninstall-shortcut.ps1") -Destination $stagingScripts -Force
+Copy-Item -Path (Join-Path $projectDir "scripts\tray.ps1") -Destination $stagingScripts -Force
 
 # Create clean data structure in staging
 $stagingData = Join-Path $stagingDir "data"

@@ -213,6 +213,7 @@
   const settingRetries = document.getElementById("setting-retries");
   const settingAutoOpen = document.getElementById("setting-auto-open");
   const settingSound = document.getElementById("setting-sound");
+  const settingRunInBackground = document.getElementById("setting-run-in-background");
 
   // Log Modal
   const logModal = document.getElementById("log-modal");
@@ -2910,6 +2911,9 @@
     settingSound.checked = currentSettings.playChime !== undefined
       ? Boolean(currentSettings.playChime)
       : (localStorage.getItem("yt_sound") !== "false");
+    if (settingRunInBackground) {
+      settingRunInBackground.checked = Boolean(currentSettings.runInBackground);
+    }
   }
 
   btnOpenSettings.addEventListener("click", () => {
@@ -2961,6 +2965,7 @@
       maxRetries: parseInt(settingRetries.value, 10),
       autoOpenFolder: settingAutoOpen.checked,
       playChime: soundEnabled,
+      runInBackground: settingRunInBackground ? settingRunInBackground.checked : false,
       theme: selectedTheme,
     };
 
