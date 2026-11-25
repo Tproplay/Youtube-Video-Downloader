@@ -97,6 +97,12 @@ if (Test-Path $ffprobeExe) {
     Copy-Item -Path $ffprobeExe -Destination (Join-Path $stagingBin "ffprobe.exe") -Force
 }
 
+$trayCs = Join-Path $projectDir "src-tray\TrayHelper.cs"
+$trayExe = Join-Path $stagingBin "tray.exe"
+if (Test-Path $trayCs) {
+    & $csc /nologo /target:winexe /optimize+ "/out:$trayExe" /r:System.Drawing.dll /r:System.Windows.Forms.dll $trayCs
+}
+
 # 5. Copy app source files into staging
 Write-Host "[5/7] Copying application code and assets..."
 Copy-Item -Path (Join-Path $projectDir "server.js") -Destination $stagingDir -Force
