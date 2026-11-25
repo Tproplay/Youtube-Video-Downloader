@@ -923,8 +923,18 @@
     if (!str) return false;
     try {
       const u = new URL(str.trim());
+      if (u.protocol !== "https:") return false;
       const host = u.hostname.toLowerCase();
-      return host.includes("youtube.com") || host === "youtu.be";
+      return (
+        host === "youtube.com" ||
+        host.endsWith(".youtube.com") ||
+        host === "youtu.be" ||
+        host === "bilibili.com" ||
+        host.endsWith(".bilibili.com") ||
+        host === "b23.tv" ||
+        host === "bilibili.tv" ||
+        host.endsWith(".bilibili.tv")
+      );
     } catch {
       return false;
     }
@@ -1644,15 +1654,23 @@
     const duration = activeVideoInfo ? activeVideoInfo.duration : 0;
     const endSec = parseDurationToSeconds(clipEnd ? clipEnd.value : "");
 
-    let embedUrl = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?enablejsapi=1&rel=0&playsinline=1&origin=${encodeURIComponent(window.location.origin)}`;
-    if (startSec > 0) {
-      embedUrl += `&start=${Math.floor(startSec)}`;
-    }
-    if (endSec > 0 && (!duration || endSec < duration)) {
-      embedUrl += `&end=${Math.floor(endSec)}`;
-    }
-    if (autoplay) {
-      embedUrl += `&autoplay=1`;
+    let embedUrl = "";
+    if (/^BV[a-zA-Z0-9]+$/.test(videoId)) {
+      embedUrl = `https://player.bilibili.com/player.html?bvid=${encodeURIComponent(videoId)}&high_quality=1&danmaku=0&autoplay=${autoplay ? 1 : 0}`;
+      if (startSec > 0) {
+        embedUrl += `&t=${Math.floor(startSec)}`;
+      }
+    } else {
+      embedUrl = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?enablejsapi=1&rel=0&playsinline=1&origin=${encodeURIComponent(window.location.origin)}`;
+      if (startSec > 0) {
+        embedUrl += `&start=${Math.floor(startSec)}`;
+      }
+      if (endSec > 0 && (!duration || endSec < duration)) {
+        embedUrl += `&end=${Math.floor(endSec)}`;
+      }
+      if (autoplay) {
+        embedUrl += `&autoplay=1`;
+      }
     }
 
     previewIframe.src = embedUrl;
@@ -1902,7 +1920,10 @@
     try {
       const u = new URL(url);
       if (u.hostname === "youtu.be") vidId = u.pathname.slice(1);
-      else vidId = u.searchParams.get("v");
+      else if (u.hostname.includes("bilibili.com")) {
+        const bv = u.pathname.match(/\/video\/(BV[a-zA-Z0-9]+)/);
+        if (bv) vidId = bv[1];
+      } else vidId = u.searchParams.get("v");
     } catch {}
 
     return historyItems.find((h) => {
@@ -1989,7 +2010,7 @@
     const lines = rawText.split("\n").map((l) => l.trim()).filter((l) => isYouTubeUrl(l));
 
     if (lines.length === 0) {
-      showToast("Please enter a valid YouTube URL.", "error");
+      showToast("Please enter a valid YouTube or Bilibili URL.", "error");
       return;
     }
 
