@@ -52,10 +52,21 @@ namespace YouTubeDownloaderTray
             }
         }
 
+        protected override void OnRenderItemImage(ToolStripItemImageRenderEventArgs e)
+        {
+            if (e.Image == null) return;
+            e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            const int iconSize = 18;
+            int y = (e.Item.Height - iconSize) / 2;
+            e.Graphics.DrawImage(e.Image, new Rectangle(16, y, iconSize, iconSize));
+        }
+
         protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
         {
             e.Graphics.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
-            var rect = new Rectangle(e.TextRectangle.X, 0, e.TextRectangle.Width, e.Item.Height);
+            const int textX = 44;
+            var rect = new Rectangle(textX, 0, Math.Max(10, e.Item.Width - textX - 16), e.Item.Height);
             TextRenderer.DrawText(
                 e.Graphics,
                 e.Text,
@@ -135,12 +146,13 @@ namespace YouTubeDownloaderTray
                 Visible = false
             };
 
+            Font menuFont = new Font("Segoe UI", 9.75f, FontStyle.Regular);
             ContextMenuStrip menu = new ContextMenuStrip
             {
                 Renderer = new ChromeDarkRenderer(),
                 ShowImageMargin = true,
                 ShowCheckMargin = false,
-                Font = new Font("Segoe UI", 9.75f, FontStyle.Regular),
+                Font = menuFont,
                 Padding = new Padding(0, 6, 0, 6),
                 AutoSize = true
             };
@@ -162,12 +174,16 @@ namespace YouTubeDownloaderTray
             }
             catch { }
 
-            ToolStripMenuItem openItem = new ToolStripMenuItem("Open YouTube Downloader", openBmp)
+            string openText = "Open YouTube Downloader";
+            Size measured = TextRenderer.MeasureText(openText, menuFont, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
+            // 44px left offset (16px left pad + 18px icon + 10px gap) + text + 16px right pad
+            int itemWidth = Math.Max(210, 44 + measured.Width + 16);
+
+            ToolStripMenuItem openItem = new ToolStripMenuItem(openText, openBmp)
             {
                 AutoSize = false,
                 Height = 34,
-                Width = 230,
-                Padding = new Padding(8, 0, 14, 0)
+                Width = itemWidth
             };
             openItem.Click += (s, e) =>
             {
@@ -179,15 +195,14 @@ namespace YouTubeDownloaderTray
             {
                 AutoSize = false,
                 Height = 10,
-                Width = 230
+                Width = itemWidth
             };
 
             ToolStripMenuItem quitItem = new ToolStripMenuItem("Exit")
             {
                 AutoSize = false,
                 Height = 34,
-                Width = 230,
-                Padding = new Padding(8, 0, 14, 0)
+                Width = itemWidth
             };
             quitItem.Click += (s, e) =>
             {
